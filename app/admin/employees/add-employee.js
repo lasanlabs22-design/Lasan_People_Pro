@@ -4,11 +4,13 @@ import { useState } from "react";
 import { UserPlus } from "lucide-react";
 import { createEmployee } from "@/app/actions/admin";
 import { Modal, SubmitButton, useFormAction } from "@/components/client";
+import { useConsumeSearchParam } from "@/components/url-params";
 import { CredentialsCard } from "@/components/credentials";
 import { Alert, Button, Field, Input, Select } from "@/components/ui";
 
 export function AddEmployee({ defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
+  useConsumeSearchParam("new", defaultOpen);
   // Remount the form on each open so the last result doesn't linger.
   const [key, setKey] = useState(0);
   return (

@@ -2,7 +2,7 @@ import Link from "@/components/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarRange, Clock3, HeartPulse, Mail, Phone, Star, UserRound } from "lucide-react";
 import { load, ApiError } from "@/lib/api";
-import { fmtDate, fmtDays, fmtDuration, fmtRange, fmtTime, HALF_DAY_LABEL, punchLabel, STATUS_TONE } from "@/lib/format";
+import { fmtDate, fmtDays, fmtDuration, fmtRange, fmtTime, HALF_DAY_LABEL, punchLabel, STATUS_TONE, threeLetterMonths, TZ } from "@/lib/format";
 import { isMonth, isYear, leavesByDate, missedCheckOut, todayIso } from "@/lib/dates";
 import { MissedCheckOut } from "@/components/missed-check-out";
 import { deleteRating } from "@/app/actions/admin";
@@ -43,7 +43,9 @@ export default async function EmployeeDetail({ params, searchParams }) {
         <ArrowLeft className="size-4" /> All employees
       </Link>
 
-      <Card className="relative overflow-hidden p-6 animate-fade-up">
+      {/* overflow-clip, not -hidden: a hidden box can still be scrolled sideways (e.g. to keep a focused
+          button in view while the actions re-render), which shoved the avatar off the left edge. */}
+      <Card className="relative overflow-clip p-6 animate-fade-up">
         <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-brand-500/20 blur-3xl" />
         <div className="relative flex flex-col gap-6 md:flex-row md:items-center">
           <Avatar src={profile.avatar} name={e.name} size={84} className="ring-2 ring-white/10" />
@@ -214,7 +216,7 @@ function RatingsTab({ id, ratings }) {
                 {r.comment && <p className="mt-2 text-sm text-fg/90">{r.comment}</p>}
                 <p className="mt-1.5 text-xs text-subtle">
                   {r.ratedByName ? `By ${r.ratedByName} · ` : ""}
-                  {new Date(r.createdAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                  {threeLetterMonths(new Date(r.createdAt).toLocaleDateString("en-IN", { dateStyle: "medium", timeZone: TZ }))}
                 </p>
               </div>
               <ActionButton action={deleteRating.bind(null, id, r.id)} confirmText="Delete this rating?" variant="ghost" size="sm">

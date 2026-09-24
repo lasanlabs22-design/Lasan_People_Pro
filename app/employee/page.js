@@ -5,6 +5,7 @@ import { fmtDate, fmtDays, fmtRange, greeting, STATUS_TONE } from "@/lib/format"
 import { Alert, Badge, Card, CardHeader, EmptyState, LinkButton, PageHeader } from "@/components/ui";
 import { BalanceCard } from "@/components/balance-card";
 import { PunchCard } from "@/components/punch-card";
+import { ConsumeSearchParam } from "@/components/url-params";
 
 export const metadata = { title: "Dashboard" };
 
@@ -33,6 +34,7 @@ export default async function EmployeeDashboard({ searchParams }) {
         }
       />
 
+      {welcome && <ConsumeSearchParam name="welcome" />}
       {welcome && (
         <Alert tone="brand" className="mb-6 flex items-center gap-2">
           <PartyPopper className="size-4" /> You&apos;re all set! Take a minute to{" "}
