@@ -9,7 +9,7 @@ import { audit } from "../lib/audit.js";
 import { createTenant, isReservedSlug } from "../lib/tenants.js";
 import { inTenant, requireAuth } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
-import { createLimiter, clientIp } from "../middleware/rate-limit.js";
+import { addressBlock, createLimiter, clientIp } from "../middleware/rate-limit.js";
 
 const { users, profiles } = schema;
 export const authRoutes = new Hono();
@@ -60,7 +60,7 @@ authRoutes.post(
   ),
   async (c) => {
     const { workspace, identifier, password: plain } = c.req.valid("json");
-    const ip = clientIp(c);
+    const ip = addressBlock(clientIp(c));
     await checkLimits(c, [[perIp, ip]]);
 
     const tenant = await findTenantBySlug(workspace);
@@ -125,7 +125,7 @@ authRoutes.post(
   ),
   async (c) => {
     const input = c.req.valid("json");
-    const ip = clientIp(c);
+    const ip = addressBlock(clientIp(c));
     await checkLimits(c, [[signups, ip]]);
     await signups.hit(ip);
 

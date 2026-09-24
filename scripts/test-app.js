@@ -200,8 +200,8 @@ try {
   console.log("Sign-in security");
   const login = (identifier, password, ip) =>
     call("/auth/login", { method: "POST", body: { workspace: W.slug, identifier, password }, headers: ip ? { "x-forwarded-for": ip } : {} });
-  // Addresses unique to this run, so earlier runs' counters don't interfere.
-  const net = (n) => `203.0.${Number.parseInt(suffix.slice(2, 4), 16)}.${n}`;
+  // Addresses unique to this run, each in its own /24 (limits count whole blocks).
+  const net = (n) => `203.${n}.${Number.parseInt(suffix.slice(2, 4), 16)}.1`;
 
   await check("a forged X-Forwarded-For can't dodge the per-address limit", async () => {
     const target = await person("SEC1");
@@ -228,7 +228,7 @@ try {
     await person("SEC3");
     ok(await login("SEC3", `${PASSWORD}2`, net(3)));
     // 50 failures from 50 different addresses exhaust the account-wide budget…
-    for (let i = 0; i < 50; i++) await login("SEC3", "wrong-password", `192.0.2.${i}, 100.64.${Number.parseInt(suffix.slice(4, 6), 16)}.${i}`);
+    for (let i = 0; i < 50; i++) await login("SEC3", "wrong-password", `192.0.2.${i}, 100.${64 + i}.${Number.parseInt(suffix.slice(4, 6), 16)}.1`);
     assert.equal((await login("SEC3", `${PASSWORD}2`, net(4))).status, 429);
     // …but the owner's usual address still gets in.
     ok(await login("SEC3", `${PASSWORD}2`, net(3)));
@@ -237,6 +237,13 @@ try {
   await check("sign-in attempts are counted in the database, not process memory", async () => {
     const [row] = await ownerSql`select count(*)::int as n from app.rate_limits where key like 'login:%'`;
     assert.ok(row.n > 0);
+  });
+
+  await check("neighbouring addresses in one /24 share a per-address budget", async () => {
+    await person("SEC4");
+    let last;
+    for (let i = 0; i < 11; i++) last = await login("SEC4", "wrong-password", `198.18.${Number.parseInt(suffix.slice(0, 2), 16)}.${i}`);
+    assert.equal(last.status, 429, JSON.stringify(last.body));
   });
 
   console.log("Maintenance");
