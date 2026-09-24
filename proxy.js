@@ -19,9 +19,10 @@ export function proxy(request) {
     return NextResponse.redirect(url);
   }
 
-  if (pathname === "/" || (pathname.startsWith("/admin") && role !== "admin") || (pathname.startsWith("/employee") && role === "admin")) {
-    return NextResponse.redirect(new URL(home, request.url));
-  }
+  // Only "/" is routed by the role hint. Which area a person may use is decided by the admin and
+  // employee layouts from their real role; bouncing between /admin and /employee here as well
+  // looped forever whenever the hint was stale (someone promoted or demoted while signed in).
+  if (pathname === "/") return NextResponse.redirect(new URL(home, request.url));
   return NextResponse.next();
 }
 
