@@ -1,9 +1,10 @@
 import Link from "@/components/link";
-import { ChevronRight, Search, Users } from "lucide-react";
+import { ChevronRight, Users } from "lucide-react";
 import { load } from "@/lib/api";
 import { fmtDate, STATUS_TONE } from "@/lib/format";
 import { Avatar, Badge, Card, EmptyState, PageHeader, Stars, Table, Th, cn } from "@/components/ui";
 import { AddEmployee } from "./add-employee";
+import { EmployeeSearch } from "./search";
 
 export const metadata = { title: "Employees" };
 
@@ -28,11 +29,7 @@ export default async function EmployeesPage({ searchParams }) {
 
       <Card className="animate-fade-up">
         <div className="flex flex-col gap-3 border-b border-white/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <form className="relative w-full sm:max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
-            <input name="q" defaultValue={q} placeholder="Search name, ID, email, team…" className="field pl-9" />
-            <input type="hidden" name="status" value={status} />
-          </form>
+          <EmployeeSearch key={status} q={q} status={status} />
           <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-white/[0.02] p-1">
             {FILTERS.map(([value, label]) => (
               <Link

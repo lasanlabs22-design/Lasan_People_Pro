@@ -110,12 +110,16 @@ export default async function MyLeaves({ searchParams }) {
                     <div className="mt-2">
                       <ActionButton
                         action={cancelLeave.bind(null, l.id)}
-                        confirmText="Cancel this leave request?"
+                        confirmText={
+                          l.status === "pending"
+                            ? "Cancel this leave request?"
+                            : `Cancel this approved leave? ${fmtDays(l.days)} will go back to your balance.`
+                        }
                         variant="ghost"
                         size="sm"
                         className="-ml-3"
                       >
-                        {l.status === "pending" ? "Withdraw request" : "Cancel leave"}
+                        {l.status === "pending" ? "Cancel request" : "Cancel leave"}
                       </ActionButton>
                     </div>
                   )}

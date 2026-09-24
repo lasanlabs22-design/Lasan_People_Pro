@@ -4,12 +4,14 @@ import { useState } from "react";
 import { CalendarPlus } from "lucide-react";
 import { applyLeave, previewLeave } from "@/app/actions/employee";
 import { Modal } from "@/components/client";
+import { useConsumeSearchParam } from "@/components/url-params";
 import { LeaveForm } from "@/components/leave-form";
 import { Button } from "@/components/ui";
 import { todayIso } from "@/lib/dates";
 
 export function ApplyLeave({ balances, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
+  useConsumeSearchParam("apply", defaultOpen);
   const [key, setKey] = useState(0);
   return (
     <>
