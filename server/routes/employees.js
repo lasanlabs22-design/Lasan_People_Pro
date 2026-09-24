@@ -69,12 +69,19 @@ const employeeSchema = z.object({
   designation: optionalText(120),
   department: optionalText(120),
   dateOfJoining: isoDate.or(z.literal("").transform(() => null)).nullish(),
-  role: z.enum(["employee", "admin"]).default("employee"),
+  // No default here: .partial() keeps defaults, so an edit that doesn't mention the role would reset it.
+  role: z.enum(["employee", "admin"]),
 });
 
 employeeRoutes.post(
   "/",
-  validate("json", employeeSchema.extend({ password: password.optional().or(z.literal("").transform(() => undefined)) })),
+  validate(
+    "json",
+    employeeSchema.extend({
+      role: employeeSchema.shape.role.default("employee"),
+      password: password.optional().or(z.literal("").transform(() => undefined)),
+    }),
+  ),
   async (c) => {
     const { password: chosen, ...data } = c.req.valid("json");
     const tempPassword = chosen || generateTempPassword();
