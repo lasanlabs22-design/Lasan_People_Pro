@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { ArrowUpRight, CalendarDays, CalendarOff, Inbox, UserCheck, Users } from "lucide-react";
 import { load } from "@/lib/api";
 import { fmtDate, fmtRange, fmtDays, fmtTime, greeting } from "@/lib/format";

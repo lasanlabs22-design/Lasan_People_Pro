@@ -1,1 +1,1 @@
-export { PageSkeleton as default } from "@/components/page-skeleton";
+export { AdminOverviewSkeleton as default } from "@/components/skeletons";

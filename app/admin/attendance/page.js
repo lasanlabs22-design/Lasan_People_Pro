@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { ChevronLeft, ChevronRight, Clock3, MapPin, UserCheck, UserX, CalendarOff } from "lucide-react";
 import { load } from "@/lib/api";
 import { addDays, isIsoDate, missedCheckOut, todayIso } from "@/lib/dates";

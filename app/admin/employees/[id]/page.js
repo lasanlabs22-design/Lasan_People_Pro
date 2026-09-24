@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarRange, Clock3, HeartPulse, Mail, Phone, Star, UserRound } from "lucide-react";
 import { load, ApiError } from "@/lib/api";

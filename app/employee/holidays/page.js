@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { CalendarDays } from "lucide-react";
 import { load } from "@/lib/api";
 import { isYear, todayIso } from "@/lib/dates";
