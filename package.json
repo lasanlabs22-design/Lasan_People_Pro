@@ -14,7 +14,8 @@
     "db:setup": "node scripts/db-setup.js",
     "db:migrate": "node scripts/migrate.js",
     "tenant:create": "node scripts/create-tenant.js",
-    "test:rls": "node scripts/test-rls.js"
+    "test:rls": "node scripts/test-rls.js",
+    "test:app": "node scripts/test-app.js"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.9.1",
