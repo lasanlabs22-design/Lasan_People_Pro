@@ -187,6 +187,14 @@ try {
     ok(await save("1995-04-12"));
     ok(await save(""));
   });
+
+  console.log("Maintenance");
+  await check("the owner can delete someone who reviewed leave (cascade isn't blocked by guards)", async () => {
+    // The workspace admin recorded (reviewed) leave above; removing them nulls reviewer_id on those rows.
+    await ownerSql`delete from users where id = ${W.adminId}`;
+    const [row] = await ownerSql`select count(*)::int as n from leave_requests where tenant_id = (select id from tenants where slug = ${W.slug}) and reviewer_id is null`;
+    assert.ok(row.n > 0);
+  });
 } finally {
   await ownerSql`delete from tenants where slug = ${W.slug}`;
   await Promise.all([ownerSql.end(), closeDb()]);
