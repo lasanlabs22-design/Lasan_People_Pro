@@ -45,3 +45,23 @@ export function lastForwarded(header) {
   const hops = (header ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   return hops.at(-1) ?? null;
 }
+
+/**
+ * The block an address belongs to, for rate-limit keys: IPv4 /24 and IPv6 /64. One visitor's
+ * address often rotates inside such a block (carrier NAT, a phone moving between towers), and an
+ * IPv6 user controls an entire /64, so per-address limits keyed on the exact address would be
+ * trivial to walk around.
+ */
+export function addressBlock(ip) {
+  const v4 = ip.match(/^(?:::ffff:)?(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/i);
+  if (v4) return `${v4[1]}.${v4[2]}.${v4[3]}.0/24`;
+  if (ip.includes(":")) {
+    // Expand "::" to the zero groups it stands for, then keep the first four groups.
+    const [head, tail] = ip.toLowerCase().split("::");
+    const left = head ? head.split(":") : [];
+    const right = tail ? tail.split(":") : [];
+    const groups = tail === undefined ? left : [...left, ...Array(8 - left.length - right.length).fill("0"), ...right];
+    return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":")}::/64`;
+  }
+  return ip;
+}
