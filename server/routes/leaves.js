@@ -72,6 +72,7 @@ async function validateRequest(user, input) {
   const days = await countLeaveDays(type, input.startDate, input.endDate, input.halfDay);
   if (days <= 0) throw badRequest("Those dates are all weekends or holidays", { startDate: "No working days selected" });
   await assertNotWorked(user.id, input);
+  await assertNoOverlap(user.id, input);
 
   const year = Number(input.startDate.slice(0, 4));
   const balance = (await leaveBalances(user, year)).find((b) => b.leaveTypeId === type.id);
@@ -89,6 +90,24 @@ async function assertNotWorked(userId, { startDate, endDate, halfDay }) {
   }
 }
 
+// Checked here rather than only on insert so the live preview can warn before the form is sent.
+async function assertNoOverlap(userId, { startDate, endDate }) {
+  const [overlapping] = await leaveQuery()
+    .where(
+      and(
+        eq(leaveRequests.userId, userId),
+        inArray(leaveRequests.status, ["pending", "approved"]),
+        lte(leaveRequests.startDate, endDate),
+        gte(leaveRequests.endDate, startDate),
+      ),
+    )
+    .limit(1);
+  if (overlapping) {
+    const when = overlapping.startDate === overlapping.endDate ? listDates([overlapping.startDate]) : `${listDates([overlapping.startDate])}–${listDates([overlapping.endDate])}`;
+    throw conflict(`Overlaps your ${overlapping.status} ${overlapping.leaveType.name} (${when}). Pick other dates.`);
+  }
+}
+
 // Leave that has already been taken is recorded by an admin, on request — employees only book ahead.
 function assertNotPast(input) {
   if (input.startDate < todayIn()) {
@@ -98,27 +117,13 @@ function assertNotPast(input) {
   }
 }
 
-/** Balance + overlap checks, then insert. Shared by employee requests and admin-recorded leave. */
+/** Balance check, then insert (overlap and worked days are checked in validateRequest). Shared by employee requests and admin-recorded leave. */
 async function createLeave(user, input, { type, days, balance }, extra = {}) {
   if (!balance || days > balance.available) {
     throw badRequest(`Not enough ${type.name} left: ${balance?.available ?? 0} available, ${days} requested`, {
       endDate: "Exceeds the balance",
     });
   }
-
-  const overlapping = await db
-    .select({ id: leaveRequests.id })
-    .from(leaveRequests)
-    .where(
-      and(
-        eq(leaveRequests.userId, user.id),
-        inArray(leaveRequests.status, ["pending", "approved"]),
-        lte(leaveRequests.startDate, input.endDate),
-        gte(leaveRequests.endDate, input.startDate),
-      ),
-    )
-    .limit(1);
-  if (overlapping.length) throw conflict("There is already a leave request covering some of these dates");
 
   const [leave] = await db
     .insert(leaveRequests)

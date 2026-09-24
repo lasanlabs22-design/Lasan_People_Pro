@@ -8,14 +8,24 @@ import { Button, cn } from "./ui";
 /**
  * useActionState wired through onSubmit instead of <form action>, so React
  * doesn't reset the fields — a validation error keeps what the user typed.
+ * When a submit comes back with an error, the message is scrolled into view:
+ * in a tall dialog it would otherwise sit above the fold and the button would
+ * look like it did nothing.
  */
 export function useFormAction(fn, initial = null) {
   const [state, dispatch, pending] = useActionState(fn, initial);
+  const formRef = useRef(null);
   const onSubmit = (e) => {
     e.preventDefault();
+    formRef.current = e.currentTarget;
     const fd = new FormData(e.currentTarget, e.nativeEvent.submitter);
     startTransition(() => dispatch(fd));
   };
+  useEffect(() => {
+    if (!state || state.ok !== false) return;
+    const target = formRef.current?.querySelector('[role="alert"], [aria-invalid="true"]');
+    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [state]);
   return [state, onSubmit, pending];
 }
 

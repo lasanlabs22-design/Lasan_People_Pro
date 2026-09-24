@@ -180,6 +180,15 @@ try {
     ok(await call("/attendance/check-in", { method: "POST", token: onLeave.token, body: here }), 201);
   });
 
+  await check("the leave preview flags an overlap before submitting", async () => {
+    // A Wednesday about five weeks out, so both requests cover working days.
+    const start = addDays(pastWednesday, 35);
+    ok(await call("/leaves", { method: "POST", token: worker.token, body: { ...leave(worker, start, "none", addDays(start, 1)), userId: undefined } }), 201);
+    const res = await call("/leaves/preview", { method: "POST", token: worker.token, body: { ...leave(worker, addDays(start, 1)), userId: undefined } });
+    assert.equal(res.status, 409);
+    assert.match(res.body.error.message, /Overlaps your pending Casual Leave/);
+  });
+
   console.log("Profile");
   await check("date of birth must be real and at least 14 years ago", async () => {
     const save = (dateOfBirth) => call("/me/profile", { method: "PUT", token: worker.token, body: { dateOfBirth } });
