@@ -6,8 +6,14 @@ import { saveAvatar, saveProfile } from "@/app/actions/employee";
 import { SubmitButton, useFormAction } from "@/components/client";
 import { Alert, Avatar, Card, CardHeader, Field, Input, Select, Textarea, cn } from "@/components/ui";
 import { BLOOD_GROUPS } from "@/lib/format";
+import { todayIso } from "@/lib/dates";
 
 const AVATAR_PX = 320;
+const MIN_AGE = 14;
+const latestBirthDate = () => {
+  const today = todayIso();
+  return `${Number(today.slice(0, 4)) - MIN_AGE}${today.slice(4)}`;
+};
 
 /** Center-crops to a square and re-encodes small enough to store inline. */
 async function toAvatarDataUrl(file) {
@@ -111,7 +117,8 @@ export function ProfileForm({ profile }) {
             <Input name="phone" type="tel" defaultValue={profile.phone ?? ""} placeholder="+91 98765 43210" error={f.phone} />
           </Field>
           <Field label="Date of birth" name="dateOfBirth" error={f.dateOfBirth}>
-            <Input name="dateOfBirth" type="date" defaultValue={profile.dateOfBirth ?? ""} error={f.dateOfBirth} />
+            {/* Same bounds as the API: a real year, and at least 14 years ago. */}
+            <Input name="dateOfBirth" type="date" min="1920-01-01" max={latestBirthDate()} defaultValue={profile.dateOfBirth ?? ""} error={f.dateOfBirth} />
           </Field>
           <Field label="Address" name="address" error={f.address} className="sm:col-span-2">
             <Textarea name="address" defaultValue={profile.address ?? ""} placeholder="House, street, city, PIN" className="min-h-20" />
