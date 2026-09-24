@@ -23,18 +23,25 @@ export const workspaceSlug = z
   .regex(/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/, "3–40 lowercase letters, numbers or hyphens");
 
 // Failed sign-ins only. Keyed by account (not the typed text), so the ID and the
-// email share one budget. The per-account cap is loose enough that someone else
-// can't easily lock a person out, but still bounds guessing from many IPs.
+// email share one budget. The per-account cap bounds guessing from many addresses;
+// an address that has signed in to the account before is exempt from it, so a
+// stranger hammering the account can't lock its owner out.
 const WINDOW = 15 * 60_000;
-const perAccountIp = createLimiter({ windowMs: WINDOW, max: 10 });
-const perAccount = createLimiter({ windowMs: WINDOW, max: 50 });
-const perIp = createLimiter({ windowMs: WINDOW, max: 100 });
+const perAccountIp = createLimiter({ name: "login:account-ip", windowMs: WINDOW, max: 10 });
+const perAccount = createLimiter({ name: "login:account", windowMs: WINDOW, max: 50 });
+const perIp = createLimiter({ name: "login:ip", windowMs: WINDOW, max: 100 });
+const trustedAddress = createLimiter({ name: "login:trusted", windowMs: 30 * 24 * 60 * 60_000, max: 1 });
 // New workspaces per visitor.
-const signups = createLimiter({ windowMs: 60 * 60_000, max: 5 });
+const signups = createLimiter({ name: "signup:ip", windowMs: 60 * 60_000, max: 5 });
 
-function checkLimits(c, keys) {
+// Checked when no such account exists, so a miss costs the same bcrypt work as a wrong
+// password and response time doesn't reveal which IDs and emails are real.
+let dummyHash;
+const hashToCompare = async (user) => user?.passwordHash ?? (dummyHash ??= await hashPassword("no-such-account"));
+
+async function checkLimits(c, keys) {
   try {
-    for (const [limiter, key] of keys) limiter.check(key);
+    for (const [limiter, key] of keys) await limiter.check(key);
   } catch (err) {
     if (err.retryAfter) c.header("Retry-After", String(err.retryAfter));
     throw err;
@@ -54,11 +61,11 @@ authRoutes.post(
   async (c) => {
     const { workspace, identifier, password: plain } = c.req.valid("json");
     const ip = clientIp(c);
-    checkLimits(c, [[perIp, ip]]);
+    await checkLimits(c, [[perIp, ip]]);
 
     const tenant = await findTenantBySlug(workspace);
     if (!tenant) {
-      perIp.hit(ip);
+      await perIp.hit(ip);
       throw badRequest("We couldn't find that workspace", { workspace: "Check the workspace name with your admin" });
     }
     if (tenant.status !== "active") throw forbidden("This workspace is suspended. Contact Lasan support.");
@@ -73,19 +80,24 @@ authRoutes.post(
         .where(or(eq(sql`lower(${users.email})`, id), eq(sql`lower(${users.employeeCode})`, id)));
 
       const account = `${tenant.id}:${user?.id ?? `unknown:${id}`}`;
+      const here = `${account}|${ip}`;
+      const trusted = user ? await trustedAddress.exceeded(here) : false;
       const keys = [
-        [perAccountIp, `${account}|${ip}`],
+        [perAccountIp, here],
         [perAccount, account],
         [perIp, ip],
       ];
-      checkLimits(c, keys);
+      await checkLimits(c, trusted ? keys.filter(([limiter]) => limiter !== perAccount) : keys);
 
-      // Same message for unknown user and wrong password so accounts can't be enumerated.
-      if (!user || !(await verifyPassword(plain, user.passwordHash))) {
-        for (const [limiter, key] of keys) limiter.hit(key);
+      // Same message (and the same bcrypt work) for unknown user and wrong password,
+      // so accounts can't be enumerated.
+      const valid = await verifyPassword(plain, await hashToCompare(user));
+      if (!user || !valid) {
+        for (const [limiter, key] of keys) await limiter.hit(key);
         throw unauthorized("Invalid ID or password");
       }
-      perAccountIp.reset(`${account}|${ip}`);
+      await perAccountIp.reset(here);
+      await trustedAddress.hit(here);
       if (user.status !== "active") throw forbidden("Your access has been revoked. Contact your administrator.");
 
       await setActor(user);
@@ -114,8 +126,8 @@ authRoutes.post(
   async (c) => {
     const input = c.req.valid("json");
     const ip = clientIp(c);
-    checkLimits(c, [[signups, ip]]);
-    signups.hit(ip);
+    await checkLimits(c, [[signups, ip]]);
+    await signups.hit(ip);
 
     const { tenant, user } = await createTenant({
       slug: input.workspace,

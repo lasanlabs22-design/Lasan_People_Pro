@@ -197,6 +197,48 @@ try {
     ok(await save(""));
   });
 
+  console.log("Sign-in security");
+  const login = (identifier, password, ip) =>
+    call("/auth/login", { method: "POST", body: { workspace: W.slug, identifier, password }, headers: ip ? { "x-forwarded-for": ip } : {} });
+  // Addresses unique to this run, so earlier runs' counters don't interfere.
+  const net = (n) => `203.0.${Number.parseInt(suffix.slice(2, 4), 16)}.${n}`;
+
+  await check("a forged X-Forwarded-For can't dodge the per-address limit", async () => {
+    const target = await person("SEC1");
+    let last;
+    // The caller rotates the first entry; the proxy-added last entry stays the same.
+    for (let i = 0; i < 11; i++) last = await login("SEC1", "wrong-password", `10.9.8.${i}, ${net(1)}`);
+    assert.equal(last.status, 429, JSON.stringify(last.body));
+    void target;
+  });
+
+  await check("an unknown ID takes as long to reject as a wrong password", async () => {
+    await person("SEC2");
+    const time = async (id) => {
+      const t = performance.now();
+      await login(id, "wrong-password", net(2));
+      return performance.now() - t;
+    };
+    const [unknown, wrong] = [await time("NOBODY"), await time("SEC2")];
+    // bcrypt at cost 12 is tens of milliseconds; a skipped check would answer in a few.
+    assert.ok(unknown > wrong * 0.5, `unknown ${unknown.toFixed(0)}ms vs wrong password ${wrong.toFixed(0)}ms`);
+  });
+
+  await check("an attacker can't lock the owner out from their usual address", async () => {
+    await person("SEC3");
+    ok(await login("SEC3", `${PASSWORD}2`, net(3)));
+    // 50 failures from 50 different addresses exhaust the account-wide budget…
+    for (let i = 0; i < 50; i++) await login("SEC3", "wrong-password", `192.0.2.${i}, 100.64.${Number.parseInt(suffix.slice(4, 6), 16)}.${i}`);
+    assert.equal((await login("SEC3", `${PASSWORD}2`, net(4))).status, 429);
+    // …but the owner's usual address still gets in.
+    ok(await login("SEC3", `${PASSWORD}2`, net(3)));
+  });
+
+  await check("sign-in attempts are counted in the database, not process memory", async () => {
+    const [row] = await ownerSql`select count(*)::int as n from app.rate_limits where key like 'login:%'`;
+    assert.ok(row.n > 0);
+  });
+
   console.log("Maintenance");
   await check("the owner can delete someone who reviewed leave (cascade isn't blocked by guards)", async () => {
     // The workspace admin recorded (reviewed) leave above; removing them nulls reviewer_id on those rows.
