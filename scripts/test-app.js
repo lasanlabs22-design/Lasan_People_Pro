@@ -179,6 +179,14 @@ try {
     ok(await call(`/leaves/${recorded.body.leave.id}/cancel`, { method: "POST", token: onLeave.token }));
     ok(await call("/attendance/check-in", { method: "POST", token: onLeave.token, body: here }), 201);
   });
+
+  console.log("Profile");
+  await check("date of birth must be real and at least 14 years ago", async () => {
+    const save = (dateOfBirth) => call("/me/profile", { method: "PUT", token: worker.token, body: { dateOfBirth } });
+    for (const bad of [addDays(today, 1), "1900-05-05", addDays(today, -365 * 5)]) assert.equal((await save(bad)).status, 400, bad);
+    ok(await save("1995-04-12"));
+    ok(await save(""));
+  });
 } finally {
   await ownerSql`delete from tenants where slug = ${W.slug}`;
   await Promise.all([ownerSql.end(), closeDb()]);

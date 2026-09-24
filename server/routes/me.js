@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { publicUser } from "../lib/auth.js";
 import { BLOOD_GROUPS, isoDate, optionalText } from "../lib/validators.js";
+import { todayIn } from "../lib/dates.js";
 import { validate } from "../middleware/validate.js";
 
 const { profiles } = schema;
@@ -24,10 +25,18 @@ const phone = z
   .or(z.literal("").transform(() => null))
   .nullish();
 
+// Staff are at least 14 (the youngest anyone can legally work); anything else is a typo.
+const MIN_AGE = 14;
+const yearsBefore = (iso, years) => `${Number(iso.slice(0, 4)) - years}${iso.slice(4)}`;
+const dateOfBirth = isoDate
+  .refine((v) => v <= todayIn(), "Date of birth can't be in the future")
+  .refine((v) => v >= "1920-01-01", "Check the year")
+  .refine((v) => v > todayIn() || v <= yearsBefore(todayIn(), MIN_AGE), `Must be at least ${MIN_AGE} years ago`);
+
 const profileSchema = z.object({
   avatar,
   phone,
-  dateOfBirth: isoDate.or(z.literal("").transform(() => null)).nullish(),
+  dateOfBirth: dateOfBirth.or(z.literal("").transform(() => null)).nullish(),
   bloodGroup: z.enum(BLOOD_GROUPS).or(z.literal("").transform(() => null)).nullish(),
   address: optionalText(500),
   emergencyContactName: optionalText(120),
