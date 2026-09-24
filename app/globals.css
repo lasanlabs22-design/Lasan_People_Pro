@@ -1,0 +1,200 @@
+@import "tailwindcss";
+
+/* The API lives in /backend and is deployed separately; don't scan it for classes. */
+@source not "../backend";
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-geist-sans), sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --color-ink-950: #05060c;
+  --color-ink-900: #0a0c16;
+  --color-ink-850: #0f1220;
+  --color-ink-800: #151929;
+  --color-ink-700: #1f2438;
+  --color-ink-600: #2c3350;
+
+  --color-fg: #eceefb;
+  --color-muted: #8f95b2;
+  --color-subtle: #5d6385;
+
+  --color-brand-50: #f1edff;
+  --color-brand-300: #b3a1ff;
+  --color-brand-400: #9a82ff;
+  --color-brand-500: #7c5cff;
+  --color-brand-600: #6843f5;
+  --color-cyan-glow: #22d3ee;
+
+  --shadow-glow: 0 0 0 1px rgb(124 92 255 / 0.35), 0 10px 40px -10px rgb(124 92 255 / 0.55);
+  --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.04) inset, 0 20px 50px -20px rgb(0 0 0 / 0.6);
+
+  --animate-fade-up: fade-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-pulse-ring: pulse-ring 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  --animate-float: float 14s ease-in-out infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.9);
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(3%, -4%, 0) scale(1.08);
+    }
+  }
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-ink-950);
+  color: var(--color-fg);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Aurora backdrop shared by every screen */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgb(124 92 255 / 0.18), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgb(34 211 238 / 0.1), transparent 60%),
+    radial-gradient(800px 600px at 50% 120%, rgb(236 72 153 / 0.08), transparent 60%),
+    var(--color-ink-950);
+}
+.aurora::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 0%, black 30%, transparent 75%);
+}
+
+@layer components {
+  .glass {
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.02));
+    border: 1px solid rgb(255 255 255 / 0.08);
+    backdrop-filter: blur(18px) saturate(140%);
+    box-shadow: var(--shadow-card);
+  }
+  .text-gradient {
+    background: linear-gradient(100deg, #fff 10%, var(--color-brand-300) 55%, var(--color-cyan-glow));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .field {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(255 255 255 / 0.09);
+    background: rgb(5 6 12 / 0.55);
+    padding: 0.65rem 0.9rem;
+    font-size: 0.875rem;
+    color: var(--color-fg);
+    outline: none;
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s,
+      background 0.15s;
+  }
+  .field::placeholder {
+    color: var(--color-subtle);
+  }
+  .field:hover {
+    border-color: rgb(255 255 255 / 0.16);
+  }
+  .field:focus {
+    border-color: var(--color-brand-400);
+    box-shadow: 0 0 0 4px rgb(124 92 255 / 0.18);
+    background: rgb(5 6 12 / 0.8);
+  }
+  .field[aria-invalid="true"] {
+    border-color: rgb(244 63 94 / 0.7);
+  }
+  .field:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  select.field {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238f95b2' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2.25rem;
+  }
+  input[type="date"].field::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+  }
+}
+
+/* Grid/flex children default to min-width:auto, so one long line can push the page wider
+   than a phone screen (and mobile browsers then zoom the whole page out). */
+.grid > *,
+main {
+  min-width: 0;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+::selection {
+  background: rgb(124 92 255 / 0.4);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-600) transparent;
+}
+
+dialog::backdrop {
+  background: rgb(3 4 10 / 0.7);
+  backdrop-filter: blur(6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
