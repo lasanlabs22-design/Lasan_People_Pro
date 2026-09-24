@@ -36,7 +36,12 @@ async function check(name, fn) {
 async function call(path, { method = "GET", body, token } = {}) {
   const res = await app.request(path, {
     method,
-    headers: { ...(body ? { "content-type": "application/json" } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    headers: {
+      // Limits persist in the database, so give each run its own visitor address.
+      "x-forwarded-for": `198.51.100.${Number.parseInt(suffix.slice(0, 2), 16)}`,
+      ...(body ? { "content-type": "application/json" } : {}),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   return { status: res.status, body: await res.json() };

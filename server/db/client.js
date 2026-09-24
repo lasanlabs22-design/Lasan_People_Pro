@@ -77,6 +77,19 @@ export async function findTenantBySlug(slug) {
   return rows[0] ?? null;
 }
 
+/**
+ * Sign-in throttling (see db/migrations/0003). Runs on the pool, outside any request
+ * transaction, so a failed sign-in's rollback can't also erase the attempt it just counted.
+ */
+export const rateLimits = {
+  async peek(key) {
+    const [row] = await root().pool`select count, retry_after from app.rate_limit_peek(${key})`;
+    return { count: row?.count ?? 0, retryAfter: row?.retry_after ?? 0 };
+  },
+  hit: (key, windowSeconds) => root().pool`select app.rate_limit_hit(${key}, ${windowSeconds})`,
+  reset: (key) => root().pool`select app.rate_limit_reset(${key})`,
+};
+
 export async function closeDb() {
   await globalThis.__lasanDb?.pool.end({ timeout: 5 });
   globalThis.__lasanDb = undefined;

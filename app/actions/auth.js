@@ -4,14 +4,17 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { api, actionError, ApiError } from "@/lib/api";
 import { setSession, homeFor } from "@/lib/session";
+import { lastForwarded } from "@/server/middleware/rate-limit";
 
 // Only allow same-site relative paths as post-login targets.
 const safeNext = (next, role) =>
   typeof next === "string" && next.startsWith(`/${role === "admin" ? "admin" : "employee"}`) && !next.startsWith("//") ? next : null;
 
+// The last X-Forwarded-For entry is the one our proxy (Railway's edge) added; earlier ones are
+// whatever the visitor sent, so trusting them would let anyone pick their own rate-limit key.
 async function visitorIp() {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0].trim() || h.get("x-real-ip") || undefined;
+  return lastForwarded(h.get("x-forwarded-for")) || h.get("x-real-ip") || undefined;
 }
 
 // Credential errors aren't expired sessions, so don't use actionError's redirect.
