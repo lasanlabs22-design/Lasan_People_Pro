@@ -6,8 +6,8 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 const spaceGrotesk = Space_Grotesk({ variable: "--font-space-grotesk", subsets: ["latin"] });
 
 export const metadata = {
-  title: { default: "Lasan People", template: "%s · Lasan People" },
-  description: "Attendance, leave and people management for Lasan.",
+  title: { default: "Lasan People Pro", template: "%s · Lasan People Pro" },
+  description: "Attendance, leave and people management for every company, by Lasan.",
 };
 
 export const viewport = { themeColor: "#05060c" };

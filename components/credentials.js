@@ -8,7 +8,7 @@ import { Alert, Button } from "./ui";
 export function CredentialsCard({ name, workspace, loginId, password }) {
   const [copied, setCopied] = useState(false);
   const signInUrl = typeof window === "undefined" ? "" : `${window.location.origin}/login?workspace=${workspace}`;
-  const text = `Hi ${name.split(" ")[0]}, here is your Lasan People login.\nSign in at: ${signInUrl}\nWorkspace: ${workspace}\nID: ${loginId}\nTemporary password: ${password}\nYou'll be asked to set your own password when you first sign in.`;
+  const text = `Hi ${name.split(" ")[0]}, here is your Lasan People Pro login.\nSign in at: ${signInUrl}\nWorkspace: ${workspace}\nID: ${loginId}\nTemporary password: ${password}\nYou'll be asked to set your own password when you first sign in.`;
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.07] p-5">

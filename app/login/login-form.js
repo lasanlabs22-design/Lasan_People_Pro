@@ -76,7 +76,7 @@ export function LoginForm({ next, workspace }) {
       </SubmitButton>
       <p className="text-center text-xs text-subtle">Forgot your password? Ask your admin to reset it.</p>
       <p className="text-center text-sm text-muted">
-        New to Lasan People?{" "}
+        New to Lasan People Pro?{" "}
         <a href="/signup" className="font-medium text-brand-300 hover:text-brand-200">
           Create a workspace
         </a>

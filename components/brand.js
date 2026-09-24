@@ -12,6 +12,9 @@ export function Logo({ className, withText = true }) {
       {withText && (
         <span className="font-display text-[17px] font-semibold tracking-tight">
           Lasan<span className="text-muted font-normal"> People</span>
+          <span className="ml-1.5 inline-block rounded-md bg-gradient-to-r from-brand-400 to-cyan-400 px-1.5 py-0.5 align-[2px] text-[10px] font-bold uppercase tracking-wider text-ink-950">
+            Pro
+          </span>
         </span>
       )}
     </span>
