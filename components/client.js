@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
+import { useRouter } from "next/navigation";
 import { Loader2, X } from "lucide-react";
 import { Button, cn } from "./ui";
 
@@ -11,16 +12,22 @@ import { Button, cn } from "./ui";
  * When a submit comes back with an error, the message is scrolled into view:
  * in a tall dialog it would otherwise sit above the fold and the button would
  * look like it did nothing.
+ * After a successful submit the page is re-fetched: the action's own response doesn't reliably
+ * carry the refreshed page when served through Railway, so revalidatePath alone left stale screens.
  */
 export function useFormAction(fn, initial = null) {
   const [state, dispatch, pending] = useActionState(fn, initial);
   const formRef = useRef(null);
+  const router = useRouter();
   const onSubmit = (e) => {
     e.preventDefault();
     formRef.current = e.currentTarget;
     const fd = new FormData(e.currentTarget, e.nativeEvent.submitter);
     startTransition(() => dispatch(fd));
   };
+  useEffect(() => {
+    if (state?.ok) router.refresh();
+  }, [state, router]);
   useEffect(() => {
     if (!state || state.ok !== false) return;
     const target = formRef.current?.querySelector('[role="alert"], [aria-invalid="true"]');
@@ -83,6 +90,7 @@ export function Modal({ open, onClose, title, description, children, className }
  */
 export function ActionButton({ action, confirmText, children, onDone, ...props }) {
   const [pending, start] = useTransition();
+  const router = useRouter();
   const [error, setError] = useState(null);
   return (
     <span className="inline-flex flex-col items-start gap-1">
@@ -95,7 +103,10 @@ export function ActionButton({ action, confirmText, children, onDone, ...props }
           start(async () => {
             const res = await action();
             if (res && res.ok === false) setError(res.error);
-            else onDone?.(res);
+            else {
+              onDone?.(res);
+              router.refresh();
+            }
           });
         }}
         {...props}
