@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { ChevronRight, Search, Users } from "lucide-react";
 import { load } from "@/lib/api";
 import { fmtDate, STATUS_TONE } from "@/lib/format";

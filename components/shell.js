@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { Logo } from "./brand";
+import { NavPending } from "./nav-pending";
 import { PoweredBy } from "./powered-by";
 import { Avatar, cn } from "./ui";
 
@@ -71,6 +72,7 @@ export function Shell({ user, tenant, badges = {}, children }) {
             {active && <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-gradient-to-b from-brand-400 to-cyan-glow" />}
             <Icon className={cn("size-[18px]", active ? "text-brand-300" : "text-subtle group-hover:text-muted")} />
             <span className="flex-1">{label}</span>
+            <NavPending spinner />
             {badge > 0 && (
               <span className="grid min-w-5 place-items-center rounded-full bg-brand-500 px-1.5 text-[10px] font-semibold text-white">
                 {badge}
@@ -174,6 +176,7 @@ function BottomNav({ items, pathname }) {
                   <Icon className="size-[18px]" />
                 </span>
                 {label === "My leaves" ? "Leaves" : label}
+                <NavPending />
               </Link>
             </li>
           );

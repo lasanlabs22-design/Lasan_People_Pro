@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
-/* The API lives in /backend and is deployed separately; don't scan it for classes. */
-@source not "../backend";
+/* Server-only code and SQL never contain class names. */
+@source not "../server";
+@source not "../db";
+@source not "../scripts";
 
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
@@ -158,6 +160,71 @@ body {
   input[type="date"].field::-webkit-calendar-picker-indicator {
     filter: invert(0.7);
     cursor: pointer;
+  }
+}
+
+/* Loading placeholders: a soft band of light sweeps across, so waiting reads as "working". */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgb(255 255 255 / 0.045);
+  border-radius: 0.5rem;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(154 130 255 / 0.1) 40%,
+    rgb(34 211 238 / 0.12) 50%,
+    rgb(154 130 255 / 0.1) 60%,
+    transparent 80%
+  );
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Thin glowing bar at the top of the screen while a tab is opening. Starts invisible so quick
+   navigations don't flash it. */
+.nav-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  height: 3px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(90deg, var(--color-brand-500), var(--color-cyan-glow), var(--color-brand-400));
+  background-size: 200% 100%;
+  box-shadow: 0 0 12px rgb(124 92 255 / 0.8);
+  transform-origin: left;
+  animation:
+    nav-progress-in 0.2s ease 80ms forwards,
+    nav-progress-grow 8s cubic-bezier(0.1, 0.7, 0.2, 1) 80ms forwards,
+    nav-progress-flow 1.2s linear infinite;
+}
+@keyframes nav-progress-in {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes nav-progress-grow {
+  from {
+    transform: scaleX(0.08);
+  }
+  to {
+    transform: scaleX(0.92);
+  }
+}
+@keyframes nav-progress-flow {
+  to {
+    background-position: -200% 0;
   }
 }
 

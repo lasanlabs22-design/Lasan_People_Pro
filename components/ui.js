@@ -1,5 +1,5 @@
 // Presentational primitives: no hooks, safe in both server and client components.
-import Link from "next/link";
+import Link from "@/components/link";
 import { initials } from "@/lib/format";
 
 export const cn = (...c) => c.filter(Boolean).join(" ");

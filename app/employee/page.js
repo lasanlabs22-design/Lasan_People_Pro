@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/link";
 import { ArrowUpRight, CalendarDays, CalendarPlus, History, PartyPopper } from "lucide-react";
 import { load } from "@/lib/api";
 import { fmtDate, fmtDays, fmtRange, greeting, STATUS_TONE } from "@/lib/format";

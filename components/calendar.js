@@ -1,5 +1,5 @@
 // Hook-free so it renders on the server; pass `onSelect` only from a client component.
-import Link from "next/link";
+import Link from "@/components/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { addMonths, monthCells, monthLabel, todayIso, weekday } from "@/lib/dates";
 import { cn } from "./ui";
