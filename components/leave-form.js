@@ -14,8 +14,16 @@ import { todayIso } from "@/lib/dates";
 export function LeaveForm({ balances, onDone, submit, preview: previewFn, minDate, submitLabel = "Submit request", reasonPlaceholder }) {
   const today = todayIso();
   const [form, setForm] = useState({ leaveTypeId: balances[0]?.leaveTypeId ?? "", startDate: today, endDate: today, halfDay: "none" });
+  // Each preview remembers the inputs it was computed for, so an answer for
+  // the previous dates is never shown as if it were for the current ones.
   const [preview, setPreview] = useState(null);
-  const [previewing, setPreviewing] = useState(false);
+  const formKey = JSON.stringify(form);
+  const current =
+    form.startDate && form.endDate && form.endDate < form.startDate
+      ? { ok: false, error: "The end date must be on or after the start date" }
+      : preview?.key === formKey
+        ? preview
+        : null;
   const [state, onSubmit, pending] = useFormAction(async (prev, fd) => {
     const res = await submit(prev, fd);
     if (res.ok) onDone();
@@ -36,13 +44,10 @@ export function LeaveForm({ balances, onDone, submit, preview: previewFn, minDat
   useEffect(() => {
     if (!form.leaveTypeId || !form.startDate || !form.endDate || form.endDate < form.startDate) return;
     let stale = false;
+    const key = JSON.stringify(form);
     const t = setTimeout(async () => {
-      setPreviewing(true);
       const res = await previewFn(form);
-      if (!stale) {
-        setPreview(res);
-        setPreviewing(false);
-      }
+      if (!stale) setPreview({ ...res, key });
     }, 250);
     return () => {
       stale = true;
@@ -50,6 +55,8 @@ export function LeaveForm({ balances, onDone, submit, preview: previewFn, minDat
     };
   }, [form, previewFn]);
 
+  // The dry run already knows this would be refused (past dates, overlap, not enough balance…).
+  const blocked = Boolean(current && (!current.ok || !current.sufficient));
   const f = state?.fields ?? {};
   if (balances.length === 0) return <Alert tone="amber">No leave types are available yet. Contact your admin.</Alert>;
 
@@ -99,22 +106,21 @@ export function LeaveForm({ balances, onDone, submit, preview: previewFn, minDat
       {!(single && type?.allowHalfDay) && <input type="hidden" name="halfDay" value="none" />}
 
       <div
+        aria-live="polite"
         className={cn(
           "flex items-center gap-3 rounded-xl border px-4 py-3 text-sm",
-          preview?.ok === false || (preview?.ok && !preview.sufficient)
-            ? "border-rose-500/30 bg-rose-500/10 text-rose-200"
-            : "border-brand-500/25 bg-brand-500/10 text-brand-50",
+          blocked ? "border-rose-500/30 bg-rose-500/10 text-rose-200" : "border-brand-500/25 bg-brand-500/10 text-brand-50",
         )}
       >
-        {previewing ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Info className="size-4 shrink-0" />}
+        {current ? <Info className="size-4 shrink-0" /> : <Loader2 className="size-4 shrink-0 animate-spin" />}
         <span>
-          {!preview
+          {!current
             ? "Calculating…"
-            : preview.ok
-              ? preview.sufficient
-                ? `This uses ${fmtDays(preview.days)} · ${fmtDays(preview.available - preview.days)} will remain`
-                : `This needs ${fmtDays(preview.days)} but only ${fmtDays(preview.available)} are available`
-              : preview.error}
+            : current.ok
+              ? current.sufficient
+                ? `This uses ${fmtDays(current.days)} · ${fmtDays(current.available - current.days)} will remain`
+                : `This needs ${fmtDays(current.days)} but only ${fmtDays(current.available)} are available`
+              : current.error}
         </span>
       </div>
 
@@ -122,7 +128,7 @@ export function LeaveForm({ balances, onDone, submit, preview: previewFn, minDat
         <Textarea name="reason" required minLength={3} placeholder={reasonPlaceholder} error={f.reason} />
       </Field>
 
-      <SubmitButton pending={pending} className="w-full" pendingText="Submitting…" disabled={preview?.ok && !preview.sufficient}>
+      <SubmitButton pending={pending} className="w-full" pendingText="Submitting…" disabled={blocked}>
         {submitLabel}
       </SubmitButton>
     </form>
