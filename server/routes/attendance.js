@@ -3,7 +3,7 @@ import { z } from "zod";
 import { and, asc, eq, gte, isNull, lte, ne } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { evaluateGeofence, formatDistance } from "../lib/geo.js";
-import { monthRange, todayIn, zonedDateTime } from "../lib/dates.js";
+import { monthRange, todayIn, weekday, zonedDateTime } from "../lib/dates.js";
 import { badRequest, conflict, notFound, ApiError } from "../lib/errors.js";
 import { isoDate, monthQuery, optionalText, uuidParam } from "../lib/validators.js";
 import { audit } from "../lib/audit.js";
@@ -12,7 +12,7 @@ import { getSetting } from "../lib/settings.js";
 import { requireRole } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 
-const { attendance, officeLocations, users, leaveRequests, leaveTypes } = schema;
+const { attendance, officeLocations, users, leaveRequests, leaveTypes, holidays } = schema;
 
 const positionSchema = z.object({
   latitude: z.number().min(-90).max(90).optional(),
@@ -151,32 +151,71 @@ attendanceRoutes.get("/mine", validate("query", z.object({ month: monthQuery.opt
 export const adminAttendanceRoutes = new Hono();
 adminAttendanceRoutes.use("*", requireRole("admin"));
 
-// Daily roll-call: every active employee with their punch and/or approved leave for the date.
-adminAttendanceRoutes.get("/", validate("query", z.object({ date: isoDate.optional() })), async (c) => {
-  const date = c.req.valid("query").date ?? todayIn();
-  const [people, punches, leaves] = await Promise.all([
+/**
+ * Who was expected in on `date`, and what happened.
+ * The roll is everyone (non-admin) who had joined by then and wasn't yet revoked — plus anyone who punched or
+ * was on leave that day, so history never loses a record. On weekly-off days and mandatory holidays nobody is
+ * expected, so a missing punch reads "off" rather than "absent".
+ */
+export async function rollCall(date) {
+  const [people, punches, leaves, dayHolidays, weekendDays] = await Promise.all([
     db
-      .select({ id: users.id, name: users.name, employeeCode: users.employeeCode, designation: users.designation })
+      .select({
+        id: users.id,
+        name: users.name,
+        employeeCode: users.employeeCode,
+        designation: users.designation,
+        dateOfJoining: users.dateOfJoining,
+        status: users.status,
+        revokedAt: users.revokedAt,
+      })
       .from(users)
-      .where(and(eq(users.status, "active"), ne(users.role, "admin")))
+      .where(ne(users.role, "admin"))
       .orderBy(asc(users.name)),
     db.select().from(attendance).where(eq(attendance.date, date)),
     db
-      .select({ userId: leaveRequests.userId, halfDay: leaveRequests.halfDay, type: leaveTypes.name, color: leaveTypes.color })
+      .select({
+        userId: leaveRequests.userId,
+        halfDay: leaveRequests.halfDay,
+        type: leaveTypes.name,
+        color: leaveTypes.color,
+        countsCalendarDays: leaveTypes.countsCalendarDays,
+      })
       .from(leaveRequests)
       .innerJoin(leaveTypes, eq(leaveTypes.id, leaveRequests.leaveTypeId))
       .where(and(eq(leaveRequests.status, "approved"), lte(leaveRequests.startDate, date), gte(leaveRequests.endDate, date))),
+    db.select({ name: holidays.name, isOptional: holidays.isOptional }).from(holidays).where(eq(holidays.date, date)),
+    getSetting("weekendDays"),
   ]);
+
+  const holiday = dayHolidays.find((h) => !h.isOptional);
+  const dayOff = holiday ? { reason: "holiday", name: holiday.name } : weekendDays.includes(weekday(date)) ? { reason: "weekend" } : null;
+
   const punchBy = new Map(punches.map((p) => [p.userId, p]));
-  const leaveBy = new Map(leaves.map((l) => [l.userId, l]));
-  const rows = people.map((p) => ({ ...p, record: punchBy.get(p.id) ?? null, leave: leaveBy.get(p.id) ?? null }));
-  const summary = {
-    total: rows.length,
-    present: rows.filter((r) => r.record).length,
-    onLeave: rows.filter((r) => r.leave && !r.record).length,
-  };
-  summary.absent = summary.total - summary.present - summary.onLeave;
-  return c.json({ date, summary, rows });
+  // Leave that skips off-days (everything but calendar-day types like maternity) doesn't apply on one.
+  const leaveBy = new Map(leaves.filter((l) => !dayOff || l.countsCalendarDays).map((l) => [l.userId, l]));
+
+  const rows = [];
+  for (const { revokedAt, dateOfJoining, status: access, ...p } of people) {
+    const record = punchBy.get(p.id) ?? null;
+    const leave = leaveBy.get(p.id) ?? null;
+    const joined = !dateOfJoining || dateOfJoining <= date;
+    const stillEmployed = access === "active" || (revokedAt && todayIn(env.APP_TIMEZONE, revokedAt) > date);
+    if (!record && !leave && !(joined && stillEmployed)) continue;
+    const status = record ? "present" : leave ? "leave" : dayOff ? "off" : "absent";
+    rows.push({ ...p, revoked: access === "revoked", record, leave, status });
+  }
+
+  const tally = (s) => rows.filter((r) => r.status === s).length;
+  const summary = { total: rows.length, present: tally("present"), onLeave: tally("leave"), off: tally("off"), absent: tally("absent") };
+  return { date, dayOff, summary, rows };
+}
+
+adminAttendanceRoutes.get("/", validate("query", z.object({ date: isoDate.optional() })), async (c) => {
+  const today = todayIn();
+  const date = c.req.valid("query").date ?? today;
+  if (date > today) throw badRequest("The roll-call only covers today and earlier", { date: "Can't be in the future" });
+  return c.json(await rollCall(date));
 });
 
 // Fill in a check-out the employee forgot, for a past day. Today stays theirs to punch.

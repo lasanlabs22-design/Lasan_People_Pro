@@ -3,34 +3,19 @@ import { and, asc, count, eq, gte, lte, ne } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { addDays, todayIn } from "../lib/dates.js";
 import { requireRole } from "../middleware/auth.js";
+import { rollCall } from "./attendance.js";
 
-const { users, attendance, leaveRequests, holidays } = schema;
+const { users, leaveRequests, holidays } = schema;
 
 export const overviewRoutes = new Hono();
 overviewRoutes.use("*", requireRole("admin"));
 
 overviewRoutes.get("/", async (c) => {
   const today = todayIn();
-  const [[employees], [present], [onLeave], [pending], upcomingHolidays] = await Promise.all([
+  const [[employees], roll, [pending], upcomingHolidays] = await Promise.all([
     db.select({ n: count() }).from(users).where(and(eq(users.status, "active"), ne(users.role, "admin"))),
-    // Same population as the roll-call: active, non-admin staff.
-    db
-      .select({ n: count() })
-      .from(attendance)
-      .innerJoin(users, eq(users.id, attendance.userId))
-      .where(and(eq(attendance.date, today), eq(users.status, "active"), ne(users.role, "admin"))),
-    db
-      .select({ n: count() })
-      .from(leaveRequests)
-      .innerJoin(users, eq(users.id, leaveRequests.userId))
-      .where(
-        and(
-          eq(leaveRequests.status, "approved"),
-          lte(leaveRequests.startDate, today),
-          gte(leaveRequests.endDate, today),
-          eq(users.status, "active"),
-        ),
-      ),
+    // Same numbers as the Attendance page, so the two never disagree.
+    rollCall(today),
     db.select({ n: count() }).from(leaveRequests).where(eq(leaveRequests.status, "pending")),
     db
       .select()
@@ -41,7 +26,8 @@ overviewRoutes.get("/", async (c) => {
   ]);
   return c.json({
     date: today,
-    stats: { employees: employees.n, present: present.n, onLeave: onLeave.n, pendingLeaves: pending.n },
+    dayOff: roll.dayOff,
+    stats: { employees: employees.n, present: roll.summary.present, onLeave: roll.summary.onLeave, pendingLeaves: pending.n },
     upcomingHolidays,
   });
 });

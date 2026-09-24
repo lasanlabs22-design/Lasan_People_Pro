@@ -13,8 +13,12 @@ export default async function AdminOverview() {
     load("/admin/leaves", { query: { status: "pending" } }),
     load("/admin/attendance"),
   ]);
-  const { stats, upcomingHolidays, date } = overview;
+  const { stats, upcomingHolidays, date, dayOff } = overview;
   const presentPct = stats.employees ? Math.round((stats.present / stats.employees) * 100) : 0;
+  const offLabel = dayOff && (dayOff.reason === "holiday" ? `${dayOff.name} — holiday` : "Weekly off");
+  const rollSubtitle = dayOff
+    ? `${offLabel} · ${roll.summary.present} in`
+    : `${roll.summary.present} in · ${roll.summary.onLeave} on leave · ${roll.summary.absent} not in`;
 
   return (
     <>
@@ -31,7 +35,7 @@ export default async function AdminOverview() {
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4 animate-fade-up">
         <StatCard label="Active employees" value={stats.employees} icon={Users} accent="brand" />
-        <StatCard label="Checked in today" value={stats.present} hint={`${presentPct}% of the team`} icon={UserCheck} accent="emerald" />
+        <StatCard label="Checked in today" value={stats.present} hint={offLabel ?? `${presentPct}% of the team`} icon={UserCheck} accent="emerald" />
         <StatCard label="On leave today" value={stats.onLeave} icon={CalendarOff} accent="cyan" />
         <StatCard label="Pending requests" value={stats.pendingLeaves} hint={stats.pendingLeaves ? "Needs your review" : "All caught up"} icon={Inbox} accent="amber" />
       </div>
@@ -70,7 +74,7 @@ export default async function AdminOverview() {
 
         <div className="grid gap-6">
           <Card>
-            <CardHeader title="Today's roll-call" subtitle={`${roll.summary.present} in · ${roll.summary.onLeave} on leave · ${roll.summary.absent} not in`} icon={UserCheck}
+            <CardHeader title="Today's roll-call" subtitle={rollSubtitle} icon={UserCheck}
               action={<Link href="/admin/attendance" className="text-xs text-brand-300 hover:text-brand-50">Details</Link>} />
             <div className="px-5 pb-5 pt-4">
               <div className="flex h-2.5 overflow-hidden rounded-full bg-white/[0.06]">
@@ -86,7 +90,9 @@ export default async function AdminOverview() {
                     </span>
                   </li>
                 ))}
-                {roll.summary.present === 0 && <li className="text-sm text-subtle">No one has checked in yet.</li>}
+                {roll.summary.present === 0 && (
+                  <li className="text-sm text-subtle">{dayOff ? "No one is expected in today." : "No one has checked in yet."}</li>
+                )}
               </ul>
             </div>
           </Card>

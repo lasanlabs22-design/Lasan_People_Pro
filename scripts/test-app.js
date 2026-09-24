@@ -10,6 +10,7 @@ import { randomBytes } from "node:crypto";
 import postgres from "postgres";
 import { getApp } from "../server/app.js";
 import { closeDb } from "../server/db/client.js";
+import { addDays, todayIn, weekday } from "../server/lib/dates.js";
 import { sslFor } from "./lib/ssl.js";
 
 const app = getApp();
@@ -48,6 +49,7 @@ async function call(path, { method = "GET", body, token, headers = {} } = {}) {
 }
 
 const ok = (res, status = 200) => assert.equal(res.status, status, JSON.stringify(res.body));
+const today = todayIn();
 
 /** Creates an employee (or admin) and signs them in with a password of their own. */
 async function person(code, extra = {}) {
@@ -98,6 +100,48 @@ try {
     });
     ok(created, 201);
     assert.equal(created.body.employee.role, "employee");
+  });
+
+  console.log("Roll-call");
+  // A Sunday at least a week back, and the Wednesday after it (still in the past).
+  const pastSunday = addDays(today, -((weekday(today) + 7) % 7) - 7);
+  const pastWednesday = addDays(pastSunday, 3);
+  const veteran = await person("OLD1", { dateOfJoining: "2020-01-01" });
+  const newcomer = await person("NEW1", { dateOfJoining: today });
+  const rollOn = async (date) => {
+    const res = await call(`/admin/attendance?date=${date}`, { token: W.token });
+    ok(res);
+    return { ...res.body, row: (id) => res.body.rows.find((r) => r.id === id) };
+  };
+
+  await check("a weekly off day reads Off, not absent", async () => {
+    const roll = await rollOn(pastSunday);
+    assert.equal(roll.dayOff?.reason, "weekend");
+    assert.equal(roll.row(veteran.id).status, "off");
+    assert.equal(roll.summary.absent, 0);
+  });
+
+  await check("a mandatory holiday reads Off", async () => {
+    const republicDay = `${today.slice(0, 4)}-01-26`;
+    if (republicDay > today) return;
+    const roll = await rollOn(republicDay);
+    assert.deepEqual(roll.dayOff, { reason: "holiday", name: "Republic Day" });
+  });
+
+  await check("someone who hadn't joined yet isn't on the roll", async () => {
+    const roll = await rollOn(pastWednesday);
+    assert.equal(roll.row(newcomer.id), undefined);
+    assert.equal(roll.row(veteran.id).status, "absent");
+  });
+
+  await check("the roll-call refuses future dates", async () => {
+    assert.equal((await call(`/admin/attendance?date=${addDays(today, 1)}`, { token: W.token })).status, 400);
+  });
+
+  await check("a revoked person stays on days before the revoke, marked revoked", async () => {
+    ok(await call(`/admin/employees/${veteran.id}/revoke`, { method: "POST", token: W.token }));
+    assert.equal((await rollOn(pastWednesday)).row(veteran.id).revoked, true);
+    assert.equal((await rollOn(today)).row(veteran.id), undefined);
   });
 } finally {
   await ownerSql`delete from tenants where slug = ${W.slug}`;
