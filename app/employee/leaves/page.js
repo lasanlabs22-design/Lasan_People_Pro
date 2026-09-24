@@ -81,7 +81,8 @@ export default async function MyLeaves({ searchParams }) {
           <div className="mt-3 max-h-[640px] divide-y divide-white/[0.05] overflow-y-auto">
             {leaves.length === 0 && <EmptyState icon={CalendarRange} title="Nothing yet" description="Apply for leave and track it here." />}
             {leaves.map((l) => {
-              const cancellable = l.status === "pending" || (l.status === "approved" && l.startDate > today);
+              // Same rule as the API: approved leave can be cancelled until the end of its first day.
+              const cancellable = l.status === "pending" || (l.status === "approved" && l.startDate >= today);
               return (
                 <div key={l.id} className="px-5 py-4">
                   <div className="flex items-start justify-between gap-3">

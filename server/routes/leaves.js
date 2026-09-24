@@ -3,7 +3,7 @@ import { z } from "zod";
 import { and, eq, gte, lte, inArray, desc, asc } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, schema } from "../db/client.js";
-import { countLeaveDays, isEligible, leaveBalances } from "../lib/leave.js";
+import { countLeaveDays, isEligible, leaveBalances, listDates, punchedDates } from "../lib/leave.js";
 import { todayIn, yearRange } from "../lib/dates.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { isoDate, optionalText, uuidParam, yearQuery } from "../lib/validators.js";
@@ -71,10 +71,22 @@ async function validateRequest(user, input) {
 
   const days = await countLeaveDays(type, input.startDate, input.endDate, input.halfDay);
   if (days <= 0) throw badRequest("Those dates are all weekends or holidays", { startDate: "No working days selected" });
+  await assertNotWorked(user.id, input);
 
   const year = Number(input.startDate.slice(0, 4));
   const balance = (await leaveBalances(user, year)).find((b) => b.leaveTypeId === type.id);
   return { type, days, balance };
+}
+
+// A day with a check-in was worked, so it can't also be a full day of leave (a half day is fine).
+async function assertNotWorked(userId, { startDate, endDate, halfDay }) {
+  if (halfDay !== "none") return;
+  const worked = await punchedDates(userId, startDate, endDate);
+  if (worked.length) {
+    throw badRequest(`Already checked in on ${listDates(worked)}. Take a half day or choose other dates.`, {
+      startDate: "Includes a day with a check-in",
+    });
+  }
 }
 
 // Leave that has already been taken is recorded by an admin, on request — employees only book ahead.
@@ -157,8 +169,8 @@ leaveRoutes.post("/:id/cancel", validate("param", uuidParam), async (c) => {
   const [leave] = await db.select().from(leaveRequests).where(and(eq(leaveRequests.id, id), eq(leaveRequests.userId, user.id)));
   if (!leave) throw notFound("Leave request");
 
-  // Pending can always be withdrawn; approved only before it starts.
-  const cancellable = leave.status === "pending" || (leave.status === "approved" && leave.startDate > todayIn());
+  // Pending can always be cancelled; approved until the end of its first day (e.g. they came in after all).
+  const cancellable = leave.status === "pending" || (leave.status === "approved" && leave.startDate >= todayIn());
   if (!cancellable) throw badRequest("This leave can no longer be cancelled");
 
   const [updated] = await db.update(leaveRequests).set({ status: "cancelled" }).where(eq(leaveRequests.id, id)).returning();
@@ -230,6 +242,16 @@ adminLeaveRoutes.post("/record", validate("json", recordSchema), async (c) => {
 async function review(c, status, comment) {
   const admin = c.get("user");
   const { id } = c.req.valid("param");
+  if (status === "approved") {
+    // They may have come in after all since applying — approving would take leave for a day they worked.
+    const [request] = await db.select().from(leaveRequests).where(eq(leaveRequests.id, id));
+    if (request?.status === "pending" && request.halfDay === "none") {
+      const worked = await punchedDates(request.userId, request.startDate, request.endDate);
+      if (worked.length) {
+        throw conflict(`They checked in on ${listDates(worked)}, so this can't be approved as full-day leave. Reject it and ask them to re-apply.`);
+      }
+    }
+  }
   // Guarded update: only a still-pending request can be decided, so two admins can't race.
   const [leave] = await db
     .update(leaveRequests)

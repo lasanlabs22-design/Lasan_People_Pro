@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useSyncExternalStore, useTransition } from "react";
-import { CheckCircle2, Fingerprint, Loader2, LogIn, LogOut, MapPin, Navigation, ShieldAlert } from "lucide-react";
+import { CheckCircle2, Fingerprint, Loader2, LogIn, LogOut, MapPin, Navigation, Palmtree, ShieldAlert } from "lucide-react";
 import { punch } from "@/app/actions/employee";
+import Link from "./link";
 import { getPosition, nearestOffice } from "@/lib/geo";
 import { fmtDate, fmtDistance, fmtDuration, fmtTime, TZ } from "@/lib/format";
 import { Card, cn } from "./ui";
@@ -22,7 +23,7 @@ function useNow() {
 }
 
 export function PunchCard({ today }) {
-  const { record, geofenceMode, offices, date } = today;
+  const { record, leave, geofenceMode, offices, date } = today;
   const now = useNow();
   const [pending, start] = useTransition();
   const [error, setError] = useState(null);
@@ -80,6 +81,19 @@ export function PunchCard({ today }) {
             <div className="flex items-center justify-center gap-2 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 py-4 text-sm font-medium text-emerald-200">
               <CheckCircle2 className="size-5" /> You&apos;re done for today. See you tomorrow!
             </div>
+          ) : state === "in" && leave ? (
+            <div className="rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-4 text-center text-sm text-cyan-100">
+              <p className="flex items-center justify-center gap-2 font-medium">
+                <Palmtree className="size-5" /> You&apos;re on {leave.name} today.
+              </p>
+              <p className="mt-1 text-xs text-cyan-100/70">
+                Working after all?{" "}
+                <Link href="/employee/leaves" className="underline underline-offset-4 hover:text-white">
+                  Cancel the leave
+                </Link>{" "}
+                first, then check in.
+              </p>
+            </div>
           ) : (
             <button
               type="button"
@@ -113,7 +127,7 @@ export function PunchCard({ today }) {
               <ShieldAlert className="mt-0.5 size-4 shrink-0" /> {error}
             </p>
           )}
-          {geofenceMode !== "off" && state !== "done" && !error && (
+          {geofenceMode !== "off" && state !== "done" && !(state === "in" && leave) && !error && (
             <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-subtle">
               <Fingerprint className="size-3.5" /> Your location is checked only when you punch.
             </p>

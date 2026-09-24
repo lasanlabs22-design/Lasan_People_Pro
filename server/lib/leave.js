@@ -3,7 +3,7 @@ import { db, schema } from "../db/client.js";
 import { eachDate, daysBetweenInclusive, weekday, yearRange } from "./dates.js";
 import { getSetting } from "./settings.js";
 
-const { leaveTypes, leaveRequests, leaveAllocations, holidays } = schema;
+const { leaveTypes, leaveRequests, leaveAllocations, holidays, attendance } = schema;
 
 export const isEligible = (type, gender) => type.eligibleGender === "any" || type.eligibleGender === gender;
 
@@ -13,6 +13,54 @@ export async function holidaySet(start, end) {
     .from(holidays)
     .where(and(gte(holidays.date, start), lte(holidays.date, end), eq(holidays.isOptional, false)));
   return new Set(rows.map((r) => r.date));
+}
+
+/** A weekly off day or a mandatory holiday. */
+export async function isOffDay(date) {
+  const weekend = await getSetting("weekendDays");
+  return weekend.includes(weekday(date)) || (await holidaySet(date, date)).has(date);
+}
+
+/** Approved full-day leave that actually applies on `date` (types that skip off-days don't apply on one). */
+export async function fullDayLeaveOn(userId, date) {
+  const rows = await db
+    .select({ name: leaveTypes.name, countsCalendarDays: leaveTypes.countsCalendarDays })
+    .from(leaveRequests)
+    .innerJoin(leaveTypes, eq(leaveTypes.id, leaveRequests.leaveTypeId))
+    .where(
+      and(
+        eq(leaveRequests.userId, userId),
+        eq(leaveRequests.status, "approved"),
+        eq(leaveRequests.halfDay, "none"),
+        lte(leaveRequests.startDate, date),
+        gte(leaveRequests.endDate, date),
+      ),
+    )
+    .limit(1);
+  const [leave] = rows;
+  if (!leave) return null;
+  if (!leave.countsCalendarDays && (await isOffDay(date))) return null;
+  return { name: leave.name };
+}
+
+/** Dates in [start, end] on which the employee punched in — they worked, so they can't also be on full-day leave. */
+export async function punchedDates(userId, start, end) {
+  const rows = await db
+    .select({ date: attendance.date })
+    .from(attendance)
+    .where(and(eq(attendance.userId, userId), gte(attendance.date, start), lte(attendance.date, end)))
+    .orderBy(asc(attendance.date));
+  return rows.map((r) => r.date);
+}
+
+const shortDate = (iso) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }).replace("Sept", "Sep");
+
+/** Plain-language list for messages: "24 Sep", "24 Sep and 25 Sep", "24 Sep, 25 Sep and 1 more". */
+export function listDates(dates) {
+  const shown = dates.slice(0, 2).map(shortDate);
+  if (dates.length > 2) return `${shown.join(", ")} and ${dates.length - 2} more`;
+  return shown.join(" and ");
 }
 
 /** Number of leave days a request consumes. */

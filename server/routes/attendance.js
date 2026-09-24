@@ -9,6 +9,7 @@ import { isoDate, monthQuery, optionalText, uuidParam } from "../lib/validators.
 import { audit } from "../lib/audit.js";
 import { env } from "../env.js";
 import { getSetting } from "../lib/settings.js";
+import { fullDayLeaveOn } from "../lib/leave.js";
 import { requireRole } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 
@@ -72,18 +73,22 @@ export const attendanceRoutes = new Hono();
 attendanceRoutes.get("/today", async (c) => {
   const user = c.get("user");
   const date = todayIn();
-  const [[record], geofenceMode, offices] = await Promise.all([
+  const [[record], geofenceMode, offices, leave] = await Promise.all([
     db.select().from(attendance).where(and(eq(attendance.userId, user.id), eq(attendance.date, date))),
     getSetting("geofenceMode"),
     activeOffices(),
+    fullDayLeaveOn(user.id, date),
   ]);
-  return c.json({ date, record: record ?? null, geofenceMode, offices });
+  return c.json({ date, record: record ?? null, leave, geofenceMode, offices });
 });
 
 attendanceRoutes.post("/check-in", validate("json", positionSchema), async (c) => {
   const user = c.get("user");
   const input = c.req.valid("json");
   const date = todayIn();
+  // Punching in on a full day of approved leave would count the day as both worked and taken.
+  const leave = await fullDayLeaveOn(user.id, date);
+  if (leave) throw conflict(`You're on approved ${leave.name} today. Cancel it from My leaves first if you're working.`);
   const pos = await resolvePosition(input);
 
   const [record] = await db

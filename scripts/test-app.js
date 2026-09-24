@@ -143,6 +143,42 @@ try {
     assert.equal((await rollOn(pastWednesday)).row(veteran.id).revoked, true);
     assert.equal((await rollOn(today)).row(veteran.id), undefined);
   });
+
+  console.log("Leave vs attendance");
+  const types = (await call("/leave-types", { token: W.token })).body.leaveTypes;
+  const casual = types.find((t) => t.code === "CASUAL").id;
+  const worker = await person("WRK1", { dateOfJoining: "2020-01-01" });
+  const here = { latitude: 13.6, longitude: 79.5, accuracy: 10 };
+  const leave = (who, start, halfDay = "none", end = start) => ({ userId: who.id, leaveTypeId: casual, startDate: start, endDate: end, halfDay, reason: "test leave" });
+
+  await check("full-day leave can't be recorded on a day they checked in", async () => {
+    ok(await call("/attendance/check-in", { method: "POST", token: worker.token, body: here }), 201);
+    const res = await call("/admin/leaves/record", { method: "POST", token: W.token, body: leave(worker, today) });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error.message, /Already checked in/);
+  });
+
+  await check("a half day on a worked day is still allowed", async () => {
+    ok(await call("/admin/leaves/record", { method: "POST", token: W.token, body: leave(worker, today, "second_half") }), 201);
+  });
+
+  await check("approving full-day leave for a day they've since worked is refused", async () => {
+    const other = await person("WRK2");
+    const applied = await call("/leaves", { method: "POST", token: other.token, body: { ...leave(other, today), userId: undefined } });
+    ok(applied, 201);
+    ok(await call("/attendance/check-in", { method: "POST", token: other.token, body: here }), 201);
+    assert.equal((await call(`/admin/leaves/${applied.body.leave.id}/approve`, { method: "POST", token: W.token, body: {} })).status, 409);
+  });
+
+  await check("check-in is refused on approved leave until the leave is cancelled", async () => {
+    const onLeave = await person("WRK3");
+    const recorded = await call("/admin/leaves/record", { method: "POST", token: W.token, body: leave(onLeave, today) });
+    ok(recorded, 201);
+    assert.equal((await call("/attendance/today", { token: onLeave.token })).body.leave?.name, "Casual Leave");
+    assert.equal((await call("/attendance/check-in", { method: "POST", token: onLeave.token, body: here })).status, 409);
+    ok(await call(`/leaves/${recorded.body.leave.id}/cancel`, { method: "POST", token: onLeave.token }));
+    ok(await call("/attendance/check-in", { method: "POST", token: onLeave.token, body: here }), 201);
+  });
 } finally {
   await ownerSql`delete from tenants where slug = ${W.slug}`;
   await Promise.all([ownerSql.end(), closeDb()]);
