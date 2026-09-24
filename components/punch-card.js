@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, Fingerprint, Loader2, LogIn, LogOut, MapPin, Navigation, Palmtree, ShieldAlert } from "lucide-react";
 import { punch } from "@/app/actions/employee";
 import Link from "./link";
@@ -27,6 +28,7 @@ export function PunchCard({ today }) {
   const now = useNow();
   const [pending, start] = useTransition();
   const [error, setError] = useState(null);
+  const router = useRouter();
   const [fix, setFix] = useState(null); // last known { latitude, longitude, accuracy }
 
   const state = !record ? "in" : !record.checkOutAt ? "out" : "done";
@@ -48,6 +50,7 @@ export function PunchCard({ today }) {
       }
       const res = await punch(state === "in" ? "in" : "out", position);
       if (!res.ok) setError(res.error);
+      else router.refresh();
     });
   }
 

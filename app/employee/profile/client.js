@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Camera, Droplet, HeartPulse, Loader2, Trash2, UserRound } from "lucide-react";
 import { saveAvatar, saveProfile } from "@/app/actions/employee";
 import { SubmitButton, useFormAction } from "@/components/client";
@@ -36,6 +37,8 @@ export function AvatarUploader({ name, avatar }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(null);
+  // Refresh so the sidebar avatar and profile-complete meter pick up the change.
+  const router = useRouter();
 
   const upload = (file) => {
     setError(null);
@@ -50,7 +53,7 @@ export function AvatarUploader({ name, avatar }) {
         if (!res.ok) {
           setPreview(null);
           setError(res.error);
-        }
+        } else router.refresh();
       } catch (e) {
         setError(e.message);
       }
@@ -87,7 +90,10 @@ export function AvatarUploader({ name, avatar }) {
             onClick={() =>
               start(async () => {
                 const res = await saveAvatar(null);
-                if (res.ok) setPreview(null);
+                if (res.ok) {
+                  setPreview(null);
+                  router.refresh();
+                }
                 else setError(res.error);
               })
             }
