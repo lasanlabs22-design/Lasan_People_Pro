@@ -15,8 +15,8 @@ export function ForgotForm() {
         <Alert tone="emerald" className="flex gap-3">
           <MailCheck className="mt-0.5 size-4 shrink-0" />
           <span>
-            Request sent. If <b>{state.adminEmail}</b> is a Lasan admin and your email has an account, they&apos;ll see your
-            request in the console. Ask them for your temporary password.
+            Request sent. If you and <b>{state.adminEmail}</b> are both Lasan admins, they&apos;ll see your request in the
+            console. Ask them for your temporary password.
           </span>
         </Alert>
         <LinkButton href="/platform/login" variant="secondary" className="w-full">

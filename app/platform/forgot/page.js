@@ -13,10 +13,10 @@ export default function ForgotPasswordPage() {
         <span className="grid size-11 place-items-center rounded-xl border border-brand-500/30 bg-brand-500/10 text-brand-300">
           <KeyRound className="size-5" />
         </span>
-        <h1 className="mt-5 font-display text-3xl font-semibold tracking-tight">Forgot your password?</h1>
+        <h1 className="mt-5 font-display text-3xl font-semibold tracking-tight">Admin password reset</h1>
         <p className="mt-2 text-sm text-muted">
-          Ask one of the Lasan admins for a temporary password. They&apos;ll see your request when they next open the console, then
-          send you the new password.
+          For Lasan admins: ask another admin for a temporary password. They&apos;ll see your request when they next open the
+          console, then send you the new password. Staff don&apos;t need this; ask an admin directly.
         </p>
         <ForgotForm />
       </div>

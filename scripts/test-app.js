@@ -425,28 +425,39 @@ try {
     assert.equal((await call(`/platform/team/${me.body.admin.id}/role`, { method: "POST", token, body: { role: "admin" } })).status, 403);
   });
 
-  await check("a forgotten password is asked of one admin, who can answer it", async () => {
+  await check("an admin who forgot their password asks another admin, who can answer it", async () => {
+    const forgetful = { email: `forgot-${suffix}@app.test` };
+    const made = await call("/platform/team", {
+      method: "POST",
+      token: P.token,
+      body: { name: "Forgetful Admin", email: forgetful.email, role: "admin", password: "Forgot0Pass" },
+    });
+    ok(made, 201);
+    forgetful.id = made.body.member.id;
     // An address block of its own per run, so the request limit doesn't carry over between runs.
     const from = `198.19.${Number.parseInt(suffix.slice(2, 4), 16)}.1`;
     const ask = (email, adminEmail) =>
       call("/platform/password-requests", { method: "POST", body: { email, adminEmail }, headers: { "x-forwarded-for": from } });
     // Same answer when the details don't match anyone, so the form can't find accounts.
     ok(await ask("nobody@app.test", P.email));
-    ok(await ask(colleague.email, "nobody@app.test"));
-    ok(await ask(P.email, colleague.email)); // asking someone who isn't an admin
+    ok(await ask(forgetful.email, "nobody@app.test"));
+    ok(await ask(forgetful.email, colleague.email)); // asking someone who isn't an admin
+    ok(await ask(colleague.email, P.email)); // staff don't use this; they ask an admin directly
     assert.equal((await call("/platform/password-requests", { token: P.token })).body.requests.length, 0);
 
-    ok(await ask(colleague.email, P.email));
-    ok(await ask(colleague.email, P.email)); // asking twice keeps one request
+    ok(await ask(forgetful.email, P.email));
+    ok(await ask(forgetful.email, P.email)); // asking twice keeps one request
     const { body } = await call("/platform/password-requests", { token: P.token });
-    assert.deepEqual(body.requests.map((r) => r.email), [colleague.email]);
+    assert.deepEqual(body.requests.map((r) => r.email), [forgetful.email]);
     assert.equal((await call("/platform/me", { token: P.token })).body.admin.passwordRequests, 1);
 
-    ok(await call(`/platform/team/${colleague.id}/reset-password`, { method: "POST", token: P.token, body: { password: "Answer0Pass" } }));
+    ok(await call(`/platform/team/${forgetful.id}/reset-password`, { method: "POST", token: P.token, body: { password: "Answer0Pass" } }));
     assert.equal((await call("/platform/password-requests", { token: P.token })).body.requests.length, 0, "answered requests close");
-    ok(await colleagueLogin("Answer0Pass"));
+    const signIn = await call("/platform/login", { method: "POST", body: { email: forgetful.email, password: "Answer0Pass" } });
+    ok(signIn);
+    assert.equal(signIn.body.admin.mustChangePassword, true);
 
-    ok(await ask(colleague.email, P.email));
+    ok(await ask(forgetful.email, P.email));
     const [open] = (await call("/platform/password-requests", { token: P.token })).body.requests;
     ok(await call(`/platform/password-requests/${open.id}/dismiss`, { method: "POST", token: P.token }));
     assert.equal((await call("/platform/password-requests", { token: P.token })).body.requests.length, 0);
@@ -485,9 +496,9 @@ try {
     const { body } = await call("/platform/me", { token: P.token });
     assert.equal((await call(`/platform/team/${body.admin.id}/deactivate`, { method: "POST", token: P.token })).status, 400);
     ok(await call(`/platform/team/${colleague.id}/deactivate`, { method: "POST", token: P.token }));
-    assert.equal((await colleagueLogin("Answer0Pass")).status, 401);
+    assert.equal((await colleagueLogin("Staff0Pass")).status, 401);
     ok(await call(`/platform/team/${colleague.id}/activate`, { method: "POST", token: P.token }));
-    ok(await colleagueLogin("Answer0Pass"));
+    ok(await colleagueLogin("Staff0Pass"));
   });
 
   await check("changing your own password needs the current one", async () => {
@@ -511,7 +522,7 @@ try {
   });
 } finally {
   await ownerSql`delete from tenants where slug in (${W.slug}, ${P.slug})`;
-  await ownerSql`delete from app.platform_admins where email in (${P.email}, ${`colleague-${suffix}@app.test`}, ${`admin2-${suffix}@app.test`})`;
+  await ownerSql`delete from app.platform_admins where email in (${P.email}, ${`colleague-${suffix}@app.test`}, ${`admin2-${suffix}@app.test`}, ${`forgot-${suffix}@app.test`})`;
   await Promise.all([ownerSql.end(), closeDb()]);
   console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}. Test workspace removed.`);
 }
