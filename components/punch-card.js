@@ -101,9 +101,9 @@ export function PunchCard({ today }) {
           <Stat label="Worked" value={worked ?? "—"} highlight={state === "out"} />
         </div>
         {record?.photos?.length > 0 && (
-          <p className="mt-3 flex items-center justify-center gap-2 text-xs text-subtle">
+          <div className="mt-3 flex items-center justify-center gap-2 text-xs text-subtle">
             Today&apos;s photos <PunchPhotos record={record} size={32} />
-          </p>
+          </div>
         )}
 
         <div className="mt-6">

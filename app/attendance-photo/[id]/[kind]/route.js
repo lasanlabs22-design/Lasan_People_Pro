@@ -12,7 +12,9 @@ export async function GET(_request, ctx) {
     throw err;
   }
   const [, type, data] = photo.match(/^data:(image\/[a-z]+);base64,(.*)$/);
+  // Never cache: on a shared device the next person to sign in would otherwise be served the
+  // previous person's (or an admin's) photos from the browser cache without a permission check.
   return new Response(Buffer.from(data, "base64"), {
-    headers: { "content-type": type, "cache-control": "private, max-age=86400, immutable" },
+    headers: { "content-type": type, "cache-control": "private, no-store" },
   });
 }

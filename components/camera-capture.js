@@ -114,13 +114,13 @@ export function CameraCapture({ onConfirm, onReady, confirmLabel = "Use photo", 
       <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/10 bg-black">
         {photo ? (
           // eslint-disable-next-line @next/next/no-img-element -- local data URL preview
-          <img src={photo} alt="Your photo" className="size-full object-cover" />
+          <img src={photo} alt="Your photo" className="size-full object-contain" />
         ) : (
           <video
             ref={video}
             playsInline
             muted
-            className={`size-full object-cover ${facing === "user" ? "-scale-x-100" : ""} ${status === "live" ? "" : "invisible"}`}
+            className={`size-full object-contain ${facing === "user" ? "-scale-x-100" : ""} ${status === "live" ? "" : "invisible"}`}
           />
         )}
         {!photo && status === "starting" && (
