@@ -298,7 +298,7 @@ try {
   });
 
   console.log("Platform console");
-  await ownerSql`insert into app.platform_admins (email, name, password_hash) values (${P.email}, 'Platform Tester', ${await bcrypt.hash(P.password, 4)})`;
+  await ownerSql`insert into app.platform_admins (email, name, role, password_hash) values (${P.email}, 'Platform Tester', 'admin', ${await bcrypt.hash(P.password, 4)})`;
   const platformLogin = (password) => call("/platform/login", { method: "POST", body: { email: P.email, password } });
 
   await check("there is no self-serve way to create a workspace", async () => {
@@ -412,13 +412,93 @@ try {
     assert.equal(login.body.admin.mustChangePassword, true);
   });
 
-  await check("staff can deactivate a colleague but not themselves", async () => {
+  await check("staff can't see the team, its admins or password requests", async () => {
+    const login = await colleagueLogin("Reset0Pass");
+    const token = (await call("/platform/password", { method: "POST", token: login.body.token, body: { currentPassword: "Reset0Pass", newPassword: "Staff0Pass" } })).body.token;
+    colleague.token = token;
+    const me = await call("/platform/me", { token });
+    assert.equal(me.body.admin.role, "staff");
+    ok(await call("/platform/workspaces", { token }));
+    for (const path of ["/platform/team", "/platform/password-requests"]) assert.equal((await call(path, { token })).status, 403, path);
+    const add = await call("/platform/team", { method: "POST", token, body: { name: "Sneaky", email: "sneaky@app.test", password: "Sneaky123" } });
+    assert.equal(add.status, 403);
+    assert.equal((await call(`/platform/team/${me.body.admin.id}/role`, { method: "POST", token, body: { role: "admin" } })).status, 403);
+  });
+
+  await check("an admin who forgot their password asks another admin, who can answer it", async () => {
+    const forgetful = { email: `forgot-${suffix}@app.test` };
+    const made = await call("/platform/team", {
+      method: "POST",
+      token: P.token,
+      body: { name: "Forgetful Admin", email: forgetful.email, role: "admin", password: "Forgot0Pass" },
+    });
+    ok(made, 201);
+    forgetful.id = made.body.member.id;
+    // An address block of its own per run, so the request limit doesn't carry over between runs.
+    const from = `198.19.${Number.parseInt(suffix.slice(2, 4), 16)}.1`;
+    const ask = (email, adminEmail) =>
+      call("/platform/password-requests", { method: "POST", body: { email, adminEmail }, headers: { "x-forwarded-for": from } });
+    // Same answer when the details don't match anyone, so the form can't find accounts.
+    ok(await ask("nobody@app.test", P.email));
+    ok(await ask(forgetful.email, "nobody@app.test"));
+    ok(await ask(forgetful.email, colleague.email)); // asking someone who isn't an admin
+    ok(await ask(colleague.email, P.email)); // staff don't use this; they ask an admin directly
+    assert.equal((await call("/platform/password-requests", { token: P.token })).body.requests.length, 0);
+
+    ok(await ask(forgetful.email, P.email));
+    ok(await ask(forgetful.email, P.email)); // asking twice keeps one request
+    const { body } = await call("/platform/password-requests", { token: P.token });
+    assert.deepEqual(body.requests.map((r) => r.email), [forgetful.email]);
+    assert.equal((await call("/platform/me", { token: P.token })).body.admin.passwordRequests, 1);
+
+    ok(await call(`/platform/team/${forgetful.id}/reset-password`, { method: "POST", token: P.token, body: { password: "Answer0Pass" } }));
+    assert.equal((await call("/platform/password-requests", { token: P.token })).body.requests.length, 0, "answered requests close");
+    const signIn = await call("/platform/login", { method: "POST", body: { email: forgetful.email, password: "Answer0Pass" } });
+    ok(signIn);
+    assert.equal(signIn.body.admin.mustChangePassword, true);
+
+    ok(await ask(forgetful.email, P.email));
+    const [open] = (await call("/platform/password-requests", { token: P.token })).body.requests;
+    ok(await call(`/platform/password-requests/${open.id}/dismiss`, { method: "POST", token: P.token }));
+    assert.equal((await call("/platform/password-requests", { token: P.token })).body.requests.length, 0);
+  });
+
+  await check("admins add admins, change roles, but can't demote themselves", async () => {
+    const added = await call("/platform/team", {
+      method: "POST",
+      token: P.token,
+      body: { name: "Second Admin", email: `admin2-${suffix}@app.test`, role: "admin", password: "Second0Pass" },
+    });
+    ok(added, 201);
+    const { body } = await call("/platform/me", { token: P.token });
+    assert.equal((await call(`/platform/team/${body.admin.id}/role`, { method: "POST", token: P.token, body: { role: "staff" } })).status, 400);
+    ok(await call(`/platform/team/${added.body.member.id}/role`, { method: "POST", token: P.token, body: { role: "staff" } }));
+    const team = (await call("/platform/team", { token: P.token })).body.team;
+    assert.equal(team.find((m) => m.id === added.body.member.id).role, "staff");
+  });
+
+  await check("the console can never be left without an active admin", async () => {
+    const { body } = await call("/platform/me", { token: P.token });
+    // Pretend every other admin is gone, inside a transaction that's rolled back.
+    await ownerSql
+      .begin(async (tx) => {
+        await tx`update app.platform_admins set is_active = false where id <> ${body.admin.id} and role = 'admin'`;
+        await assert.rejects(tx.savepoint((sp) => sp`select app.platform_admin_set_role(${body.admin.id}, 'staff')`), /at least one active admin/);
+        await assert.rejects(tx.savepoint((sp) => sp`select app.platform_admin_set_active(${body.admin.id}, false)`), /at least one active admin/);
+        throw Object.assign(new Error("rollback"), { rollback: true });
+      })
+      .catch((err) => {
+        if (!err.rollback) throw err;
+      });
+  });
+
+  await check("admins can deactivate a colleague but not themselves", async () => {
     const { body } = await call("/platform/me", { token: P.token });
     assert.equal((await call(`/platform/team/${body.admin.id}/deactivate`, { method: "POST", token: P.token })).status, 400);
     ok(await call(`/platform/team/${colleague.id}/deactivate`, { method: "POST", token: P.token }));
-    assert.equal((await colleagueLogin("Reset0Pass")).status, 401);
+    assert.equal((await colleagueLogin("Staff0Pass")).status, 401);
     ok(await call(`/platform/team/${colleague.id}/activate`, { method: "POST", token: P.token }));
-    ok(await colleagueLogin("Reset0Pass"));
+    ok(await colleagueLogin("Staff0Pass"));
   });
 
   await check("changing your own password needs the current one", async () => {
@@ -442,7 +522,7 @@ try {
   });
 } finally {
   await ownerSql`delete from tenants where slug in (${W.slug}, ${P.slug})`;
-  await ownerSql`delete from app.platform_admins where email in (${P.email}, ${`colleague-${suffix}@app.test`})`;
+  await ownerSql`delete from app.platform_admins where email in (${P.email}, ${`colleague-${suffix}@app.test`}, ${`admin2-${suffix}@app.test`}, ${`forgot-${suffix}@app.test`})`;
   await Promise.all([ownerSql.end(), closeDb()]);
   console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}. Test workspace removed.`);
 }

@@ -20,6 +20,12 @@ export function PlatformLoginForm() {
       <SubmitButton pending={pending} size="lg" className="w-full" pendingText="Signing in…">
         Sign in <ArrowRight className="size-4" />
       </SubmitButton>
+      <div className="text-center text-sm text-muted">
+        <a href="/platform/forgot" className="hover:text-fg">
+          Admin? Forgot your password
+        </a>
+        <p className="mt-1 text-xs text-subtle">Staff: ask a Lasan admin to set a temporary password for you.</p>
+      </div>
     </form>
   );
 }

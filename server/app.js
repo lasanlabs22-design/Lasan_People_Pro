@@ -66,6 +66,8 @@ export function createApp() {
       return c.json({ error: { message, code: "conflict", fields: field ? { [field]: message } : undefined } }, 409);
     }
     if (pg?.code === "23503") return c.json({ error: { message: "Referenced record does not exist", code: "bad_request" } }, 400);
+    // A rule enforced in the database (raise exception) whose message is written for people.
+    if (pg?.code === "P0001") return c.json({ error: { message: pg.message, code: "conflict" } }, 409);
     // Row-level security or a guard trigger refused the write.
     if (pg?.code === "42501") {
       console.warn("blocked by database policy:", pg.message);

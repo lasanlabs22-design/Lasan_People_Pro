@@ -440,6 +440,14 @@ npm run platform:admin -- --list
 Then sign in at `/platform/login`, select **Create workspace**, and send the new company's admin the login the
 console shows. They must replace the password on first sign-in.
 
+The console has two roles. **Admins** manage the **Lasan team** page: they add people as Admin or Staff, change
+roles, deactivate accounts and give out temporary passwords. **Staff** set up and manage workspaces but can't see the
+team. Nobody can demote or deactivate themselves, and the console always keeps at least one active admin.
+
+Forgot your password? Select **Forgot password?** on the console sign-in page and enter your email and the email of
+the admin you're asking. The request waits in that admin's **Lasan team** page until they give you a temporary
+password. If every admin is locked out, reset one from the terminal with `npm run platform:admin`.
+
 A workspace can also be created from the terminal:
 
 ```bash

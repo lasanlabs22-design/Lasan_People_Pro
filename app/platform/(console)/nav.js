@@ -8,14 +8,17 @@ import { cn } from "@/components/ui";
 
 const TABS = [
   { href: "/platform", label: "Workspaces", icon: Building2 },
-  { href: "/platform/team", label: "Lasan team", icon: UsersRound },
+  // The team, its admins and their password requests are for admins only.
+  { href: "/platform/team", label: "Lasan team", icon: UsersRound, adminOnly: true },
 ];
 
-export function ConsoleNav() {
+export function ConsoleNav({ isAdmin, passwordRequests = 0 }) {
   const pathname = usePathname();
+  const tabs = TABS.filter((t) => isAdmin || !t.adminOnly);
+  if (tabs.length < 2) return null;
   return (
     <nav className="mb-8 flex gap-1 rounded-xl border border-white/[0.06] bg-white/[0.02] p-1 sm:w-fit">
-      {TABS.map(({ href, label, icon: Icon }) => (
+      {tabs.map(({ href, label, icon: Icon, adminOnly }) => (
         <Link
           key={href}
           href={href}
@@ -25,13 +28,21 @@ export function ConsoleNav() {
           )}
         >
           <Icon className="size-4" /> {label}
+          {adminOnly && passwordRequests > 0 && (
+            <span
+              className="grid min-w-5 place-items-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-ink-950"
+              title={`${passwordRequests} password request${passwordRequests === 1 ? "" : "s"} waiting`}
+            >
+              {passwordRequests}
+            </span>
+          )}
         </Link>
       ))}
     </nav>
   );
 }
 
-export function AccountMenu({ name, email }) {
+export function AccountMenu({ name, email, role }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -53,7 +64,10 @@ export function AccountMenu({ name, email }) {
       </button>
       {open && (
         <div className="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-xl border border-white/10 bg-ink-900/95 shadow-2xl backdrop-blur">
-          <p className="truncate border-b border-white/[0.06] px-4 py-3 text-xs text-subtle">{email}</p>
+          <div className="border-b border-white/[0.06] px-4 py-3">
+            <p className="truncate text-xs text-subtle">{email}</p>
+            <p className="mt-0.5 text-xs font-medium text-muted">{role === "admin" ? "Admin" : "Staff"}</p>
+          </div>
           <Link
             href="/platform/password"
             onClick={() => setOpen(false)}

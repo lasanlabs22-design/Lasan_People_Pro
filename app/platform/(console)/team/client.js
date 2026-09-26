@@ -1,10 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, KeyRound, Pause, Play, UserPlus } from "lucide-react";
-import { addStaff, resetStaffPassword, setStaffActive } from "@/app/actions/platform";
+import { Check, Copy, KeyRound, Pause, Play, ShieldMinus, ShieldPlus, UserPlus } from "lucide-react";
+import { addStaff, dismissPasswordRequest, resetStaffPassword, setStaffActive, setStaffRole } from "@/app/actions/platform";
 import { ActionButton, Modal, SubmitButton, useFormAction } from "@/components/client";
-import { Alert, Button, Field, Input } from "@/components/ui";
+import { Alert, Badge, Button, Field, Input } from "@/components/ui";
+import { TZ } from "@/lib/format";
+
+const ROLE_CHOICES = [
+  { value: "staff", title: "Staff", text: "Sets up and manages workspaces. Can't see the team." },
+  { value: "admin", title: "Admin", text: "Also manages the team and gives out temporary passwords." },
+];
 
 /** A one-time console login to hand to a colleague. */
 function StaffCredentials({ name, email, password }) {
@@ -72,13 +78,13 @@ export function AddStaff() {
   return (
     <>
       <Button onClick={() => setOpen(true)}>
-        <UserPlus className="size-4" /> Add staff member
+        <UserPlus className="size-4" /> Add to team
       </Button>
       <Modal
         open={open}
         onClose={close}
-        title={added ? "Staff member added" : "Add a Lasan staff member"}
-        description={added ? "Send them this login." : "They'll be able to create and manage workspaces, and manage this team."}
+        title={added ? `${added.member.name} added as ${added.member.role}` : "Add someone to the Lasan team"}
+        description={added ? "Send them this login." : "They sign in to this console with their email."}
       >
         {added ? (
           <div className="space-y-4">
@@ -111,9 +117,24 @@ function AddStaffForm({ onAdded }) {
       <Field label="Email" name="email" error={f.email} hint="They sign in with this">
         <Input name="email" type="email" required error={f.email} />
       </Field>
+      <fieldset>
+        <legend className="mb-2 text-xs font-medium text-muted">Role</legend>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {ROLE_CHOICES.map((r) => (
+            <label
+              key={r.value}
+              className="cursor-pointer rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 transition-colors has-[:checked]:border-brand-400/60 has-[:checked]:bg-brand-500/10"
+            >
+              <input type="radio" name="role" value={r.value} defaultChecked={r.value === "staff"} className="sr-only" />
+              <span className="block text-sm font-medium">{r.title}</span>
+              <span className="mt-0.5 block text-xs text-muted">{r.text}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <PasswordFields f={f} />
       <SubmitButton pending={pending} size="lg" className="w-full" pendingText="Adding…">
-        Add staff member
+        Add to the team
       </SubmitButton>
     </form>
   );
@@ -121,12 +142,27 @@ function AddStaffForm({ onAdded }) {
 
 export function StaffActions({ member }) {
   const [resetOpen, setResetOpen] = useState(false);
+  const admin = member.role === "admin";
   return (
     <div className="flex flex-wrap justify-end gap-2">
       {member.active && (
         <Button variant="secondary" size="sm" onClick={() => setResetOpen(true)}>
-          <KeyRound className="size-3.5" /> Reset password
+          <KeyRound className="size-3.5" /> Temporary password
         </Button>
+      )}
+      {member.active && (
+        <ActionButton
+          variant="secondary"
+          size="sm"
+          action={setStaffRole.bind(null, member.id, admin ? "staff" : "admin")}
+          confirmText={
+            admin
+              ? `Make ${member.name} staff? They'll no longer see or manage the team.`
+              : `Make ${member.name} an admin? They'll be able to manage the team and give out temporary passwords.`
+          }
+        >
+          {admin ? <ShieldMinus className="size-3.5" /> : <ShieldPlus className="size-3.5" />} {admin ? "Make staff" : "Make admin"}
+        </ActionButton>
       )}
       {member.active ? (
         <ActionButton
@@ -142,7 +178,7 @@ export function StaffActions({ member }) {
           <Play className="size-3.5" /> Reactivate
         </ActionButton>
       )}
-      <Modal open={resetOpen} onClose={() => setResetOpen(false)} title={`Reset ${member.name}'s password`}>
+      <Modal open={resetOpen} onClose={() => setResetOpen(false)} title={`Temporary password for ${member.name}`}>
         {resetOpen && <ResetPassword member={member} onDone={() => setResetOpen(false)} />}
       </Modal>
     </div>
@@ -172,9 +208,47 @@ function ResetPassword({ member, onDone }) {
       <Alert>{state?.error}</Alert>
       <p className="text-sm text-muted">They&apos;re signed out everywhere and must choose a new password with this one.</p>
       <PasswordFields f={f} />
-      <SubmitButton pending={pending} className="w-full" pendingText="Resetting…">
-        Reset password
+      <SubmitButton pending={pending} className="w-full" pendingText="Saving…">
+        Set temporary password
       </SubmitButton>
     </form>
+  );
+}
+
+/** People who forgot their password and asked this admin for a temporary one. */
+export function PasswordRequests({ requests }) {
+  const [answering, setAnswering] = useState(null);
+  return (
+    <>
+      <ul className="mt-3 divide-y divide-white/[0.05]">
+        {requests.map((r) => (
+          <li key={r.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-2 font-medium">
+                {r.name} <Badge tone={r.role === "admin" ? "amber" : "slate"}>{r.role}</Badge>
+              </p>
+              <p className="text-xs text-muted">
+                {r.email} · asked {new Date(r.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: TZ })}
+              </p>
+            </div>
+            <Button size="sm" onClick={() => setAnswering(r)}>
+              <KeyRound className="size-3.5" /> Give temporary password
+            </Button>
+            <ActionButton variant="ghost" size="sm" action={dismissPasswordRequest.bind(null, r.id)} confirmText={`Dismiss ${r.name}'s request?`}>
+              Dismiss
+            </ActionButton>
+          </li>
+        ))}
+      </ul>
+      <div className="h-2" />
+      <Modal open={!!answering} onClose={() => setAnswering(null)} title={answering ? `Temporary password for ${answering.name}` : ""}>
+        {answering && (
+          <ResetPassword
+            member={{ id: answering.requesterId, name: answering.name, email: answering.email }}
+            onDone={() => setAnswering(null)}
+          />
+        )}
+      </Modal>
+    </>
   );
 }

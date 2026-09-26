@@ -105,9 +105,19 @@ export const platform = {
   },
   signedIn: (id) => root().pool`select app.platform_admin_signed_in(${id})`,
   team: () => root().pool`select * from app.platform_admins()`,
-  async createAdmin({ email, name, passwordHash, createdBy }) {
-    const [row] = await root().pool`select app.platform_admin_create(${email}, ${name}, ${passwordHash}, ${createdBy}) as id`;
+  async createAdmin({ email, name, role, passwordHash, createdBy }) {
+    const [row] = await root().pool`select app.platform_admin_create(${email}, ${name}, ${role}::app.platform_role, ${passwordHash}, ${createdBy}) as id`;
     return row.id;
+  },
+  async setRole(id, role) {
+    const [row] = await root().pool`select app.platform_admin_set_role(${id}, ${role}::app.platform_role) as ok`;
+    return row.ok;
+  },
+  requestPasswordReset: (email, adminEmail) => root().pool`select app.platform_request_password_reset(${email}, ${adminEmail})`,
+  passwordRequestsFor: (adminId) => root().pool`select * from app.platform_password_requests_for(${adminId})`,
+  async closePasswordRequest(requesterId, byId) {
+    const [row] = await root().pool`select app.platform_password_request_close(${requesterId}, ${byId}) as ok`;
+    return row.ok;
   },
   /** Returns the new token version, or null if there's no such admin. */
   async setPassword(id, passwordHash, mustChange) {

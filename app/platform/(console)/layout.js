@@ -12,9 +12,9 @@ export default async function ConsoleLayout({ children }) {
           <Logo />
           <Badge tone="amber">Platform</Badge>
         </div>
-        <AccountMenu name={admin.name} email={admin.email} />
+        <AccountMenu name={admin.name} email={admin.email} role={admin.role} />
       </header>
-      {!admin.mustChangePassword && <ConsoleNav />}
+      {!admin.mustChangePassword && <ConsoleNav isAdmin={admin.role === "admin"} passwordRequests={admin.passwordRequests} />}
       {children}
     </div>
   );

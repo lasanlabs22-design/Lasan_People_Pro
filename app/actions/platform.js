@@ -88,7 +88,7 @@ export async function addStaff(_prev, fd) {
   try {
     const res = await platformApi("/platform/team", {
       method: "POST",
-      body: { name: field(fd, "name"), email: field(fd, "email"), password },
+      body: { name: field(fd, "name"), email: field(fd, "email"), role: field(fd, "role") || "staff", password },
     });
     revalidatePath("/platform/team");
     return { ok: true, ...res, password };
@@ -101,11 +101,49 @@ export async function resetStaffPassword(id, _prev, fd) {
   const password = String(fd.get("password") ?? "");
   try {
     await platformApi(`/platform/team/${id}/reset-password`, { method: "POST", body: { password } });
-    revalidatePath("/platform/team");
+    // Also clears any request they'd made, which shows in the menu bar.
+    revalidatePath("/platform", "layout");
     return { ok: true, password };
   } catch (err) {
     return platformError(err);
   }
+}
+
+export async function setStaffRole(id, role) {
+  try {
+    await platformApi(`/platform/team/${id}/role`, { method: "POST", body: { role } });
+    revalidatePath("/platform/team");
+    return { ok: true };
+  } catch (err) {
+    return platformError(err);
+  }
+}
+
+export async function dismissPasswordRequest(id) {
+  try {
+    await platformApi(`/platform/password-requests/${id}/dismiss`, { method: "POST" });
+    revalidatePath("/platform", "layout");
+    return { ok: true };
+  } catch (err) {
+    return platformError(err);
+  }
+}
+
+/** "Forgot password" from the sign-in page: no session, and the same answer whatever was typed. */
+export async function requestPlatformPasswordReset(_prev, fd) {
+  const h = await headers();
+  try {
+    await api("/platform/password-requests", {
+      method: "POST",
+      body: { email: field(fd, "email"), adminEmail: field(fd, "adminEmail") },
+      token: null,
+      clientIp: lastForwarded(h.get("x-forwarded-for")) || h.get("x-real-ip") || undefined,
+    });
+  } catch (err) {
+    if (err instanceof ApiError) return { ok: false, error: err.message, fields: err.fields };
+    throw err;
+  }
+  return { ok: true, adminEmail: field(fd, "adminEmail") };
 }
 
 export async function setStaffActive(id, active) {
