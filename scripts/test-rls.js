@@ -12,6 +12,9 @@ import { getApp } from "../server/app.js";
 import { closeDb } from "../server/db/client.js";
 import { sslFor } from "./lib/ssl.js";
 
+// The test workspaces are made through self-serve sign-up, which is off by default.
+process.env.ALLOW_PUBLIC_SIGNUP = "true";
+
 const app = getApp();
 const suffix = randomBytes(3).toString("hex");
 const A = { slug: `rls-a-${suffix}`, company: "RLS Test A" };
@@ -232,6 +235,15 @@ try {
     await asApp({ tenantId: A.id, userId: A.empId, role: "employee" }, (tx) =>
       expectPgError("42501", () => tx`insert into holidays (date, name) values ('2026-03-04', 'self-declared')`),
     );
+  });
+
+  await check("the app role can't read or add platform admins directly", async () => {
+    await asApp({ tenantId: A.id, role: "admin" }, async (tx) => {
+      await expectPgError("42501", () => tx.savepoint((sp) => sp`select * from app.platform_admins`));
+      await expectPgError("42501", () =>
+        tx.savepoint((sp) => sp`insert into app.platform_admins (email, name, password_hash) values ('x@x.test', 'x', 'x')`),
+      );
+    });
   });
 
   await check("the audit log can't be rewritten", async () => {

@@ -26,3 +26,7 @@ function load() {
 }
 
 export const env = new Proxy({}, { get: (_, key) => load()[key] });
+
+// Off unless ALLOW_PUBLIC_SIGNUP=true: workspaces are created by Lasan from the platform console.
+// Read live (not cached with the rest) so tests can flip it.
+export const publicSignupEnabled = () => process.env.ALLOW_PUBLIC_SIGNUP === "true";

@@ -14,6 +14,7 @@
     "db:setup": "node scripts/db-setup.js",
     "db:migrate": "node scripts/migrate.js",
     "tenant:create": "node scripts/create-tenant.js",
+    "platform:admin": "node scripts/platform-admin.js",
     "test:rls": "node scripts/test-rls.js",
     "test:app": "node scripts/test-app.js"
   },

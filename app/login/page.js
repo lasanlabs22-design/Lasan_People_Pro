@@ -3,6 +3,7 @@ import { Logo } from "@/components/brand";
 import { Alert } from "@/components/ui";
 import { PoweredBy } from "@/components/powered-by";
 import { getWorkspace } from "@/lib/session";
+import { publicSignupEnabled } from "@/server/env";
 import { LoginForm } from "./login-form";
 
 export const metadata = { title: "Sign in" };
@@ -60,7 +61,7 @@ export default async function LoginPage({ searchParams }) {
           {reason === "revoked" && (
             <Alert className="mt-6">Your access has been revoked. Contact your administrator if this is a mistake.</Alert>
           )}
-          <LoginForm next={typeof next === "string" ? next : ""} workspace={prefill} />
+          <LoginForm next={typeof next === "string" ? next : ""} workspace={prefill} signupOpen={publicSignupEnabled()} />
         </div>
         <PoweredBy />
       </section>

@@ -90,6 +90,27 @@ export const rateLimits = {
   reset: (key) => root().pool`select app.rate_limit_reset(${key})`,
 };
 
+/**
+ * Platform (super) admins and the cross-workspace view they manage (see db/migrations/0005).
+ * They sit outside every tenant, so these run on the pool through definer functions.
+ */
+export const platform = {
+  async adminByEmail(email) {
+    const [row] = await root().pool`select * from app.platform_admin_by_email(${email})`;
+    return row ?? null;
+  },
+  async adminById(id) {
+    const [row] = await root().pool`select * from app.platform_admin_by_id(${id})`;
+    return row ?? null;
+  },
+  signedIn: (id) => root().pool`select app.platform_admin_signed_in(${id})`,
+  workspaces: () => root().pool`select * from app.platform_workspaces()`,
+  async setWorkspaceStatus(id, status) {
+    const [row] = await root().pool`select app.platform_set_workspace_status(${id}, ${status}) as ok`;
+    return row.ok;
+  },
+};
+
 export async function closeDb() {
   await globalThis.__lasanDb?.pool.end({ timeout: 5 });
   globalThis.__lasanDb = undefined;

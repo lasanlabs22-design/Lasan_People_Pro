@@ -20,13 +20,37 @@ export async function signToken(user) {
 export async function verifyToken(token) {
   try {
     const { payload } = await jwtVerify(token, secret(), { issuer: ISSUER, algorithms: ["HS256"] });
-    return payload.sub && payload.tid ? payload : null;
+    return payload.sub && payload.tid && !payload.aud ? payload : null;
   } catch {
     return null;
   }
 }
 
-export const hashPassword = (plain) => bcrypt.hash(plain, 12);
+// Platform-admin tokens carry their own audience and no `tid`, so they can never open a workspace
+// (verifyToken needs `tid`) and workspace tokens can never open the platform console.
+const PLATFORM_AUDIENCE = "lasan-pro-platform";
+
+export async function signPlatformToken(admin) {
+  return new SignJWT({ tv: admin.token_version })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(admin.id)
+    .setIssuer(ISSUER)
+    .setAudience(PLATFORM_AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime("12h")
+    .sign(secret());
+}
+
+export async function verifyPlatformToken(token) {
+  try {
+    const { payload } = await jwtVerify(token, secret(), { issuer: ISSUER, audience: PLATFORM_AUDIENCE, algorithms: ["HS256"] });
+    return payload.sub && !payload.tid ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+export const hashPassword =(plain) => bcrypt.hash(plain, 12);
 export const verifyPassword = (plain, hash) => bcrypt.compare(plain, hash);
 
 // Readable temporary password: no ambiguous characters (0/O, 1/l/I).

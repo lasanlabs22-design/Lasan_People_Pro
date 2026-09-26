@@ -7,6 +7,7 @@ import { badRequest, unauthorized, forbidden } from "../lib/errors.js";
 import { password } from "../lib/validators.js";
 import { audit } from "../lib/audit.js";
 import { createTenant, isReservedSlug } from "../lib/tenants.js";
+import { publicSignupEnabled } from "../env.js";
 import { inTenant, requireAuth } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 import { addressBlock, createLimiter, clientIp } from "../middleware/rate-limit.js";
@@ -109,21 +110,25 @@ authRoutes.post(
   },
 );
 
-// Self-serve: a company creates its own workspace and becomes its first admin.
+// A new workspace and its first admin; used by self-serve sign-up and the platform console.
+export const newWorkspaceSchema = z.object({
+  companyName: z.string().trim().min(2, "Enter the company name").max(80),
+  workspace: workspaceSlug.refine((s) => !isReservedSlug(s), "That name is reserved, pick another"),
+  name: z.string().trim().min(2, "Enter the full name").max(120),
+  email: z.email("Enter a valid email").trim().toLowerCase(),
+  employeeCode: z.string().trim().regex(/^[A-Za-z0-9_-]{2,32}$/, "2–32 letters, numbers, - or _").default("ADMIN"),
+  password,
+});
+
+// Self-serve: a company creates its own workspace and becomes its first admin. Off unless
+// ALLOW_PUBLIC_SIGNUP=true; normally Lasan creates workspaces from the platform console.
 authRoutes.post(
   "/register",
-  validate(
-    "json",
-    z.object({
-      companyName: z.string().trim().min(2, "Enter your company name").max(80),
-      workspace: workspaceSlug.refine((s) => !isReservedSlug(s), "That name is reserved, pick another"),
-      name: z.string().trim().min(2, "Enter your full name").max(120),
-      email: z.email("Enter a valid email").trim().toLowerCase(),
-      employeeCode: z.string().trim().regex(/^[A-Za-z0-9_-]{2,32}$/, "2–32 letters, numbers, - or _").default("ADMIN"),
-      password,
-    }),
-  ),
+  validate("json", newWorkspaceSchema),
   async (c) => {
+    if (!publicSignupEnabled()) {
+      throw forbidden("New workspaces are set up by Lasan. Contact us to get one.");
+    }
     const input = c.req.valid("json");
     const ip = addressBlock(clientIp(c));
     await checkLimits(c, [[signups, ip]]);

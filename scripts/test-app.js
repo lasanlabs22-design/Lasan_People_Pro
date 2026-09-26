@@ -7,15 +7,20 @@
 import "./lib/load-env.js";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
+import bcrypt from "bcryptjs";
 import postgres from "postgres";
 import { getApp } from "../server/app.js";
 import { closeDb } from "../server/db/client.js";
 import { addDays, todayIn, weekday } from "../server/lib/dates.js";
 import { sslFor } from "./lib/ssl.js";
 
+// The test workspace is made through self-serve sign-up, which is off by default.
+process.env.ALLOW_PUBLIC_SIGNUP = "true";
+
 const app = getApp();
 const suffix = randomBytes(3).toString("hex");
 const W = { slug: `app-${suffix}`, company: "App Test" };
+const P = { email: `platform-${suffix}@app.test`, password: "Platf0rmPass", slug: `plat-${suffix}` };
 const PASSWORD = "Passw0rd!";
 // A made-up visitor address per run, so rate limits from earlier runs don't interfere.
 const IP = `198.51.100.${Number.parseInt(suffix.slice(0, 2), 16)}`;
@@ -295,6 +300,87 @@ try {
     assert.equal(last.status, 429, JSON.stringify(last.body));
   });
 
+  console.log("Platform console");
+  await ownerSql`insert into app.platform_admins (email, name, password_hash) values (${P.email}, 'Platform Tester', ${await bcrypt.hash(P.password, 4)})`;
+  const platformLogin = (password) => call("/platform/login", { method: "POST", body: { email: P.email, password } });
+
+  await check("self-serve sign-up is refused unless turned on", async () => {
+    process.env.ALLOW_PUBLIC_SIGNUP = "false";
+    try {
+      const res = await call("/auth/register", {
+        method: "POST",
+        body: { companyName: "Nope", workspace: `nope-${suffix}`, name: "Nope", email: "nope@app.test", password: PASSWORD },
+      });
+      assert.equal(res.status, 403);
+    } finally {
+      process.env.ALLOW_PUBLIC_SIGNUP = "true";
+    }
+  });
+
+  await check("platform sign-in checks the password", async () => {
+    assert.equal((await platformLogin("wrong-password1")).status, 401);
+    const res = await platformLogin(P.password);
+    ok(res);
+    P.token = res.body.token;
+  });
+
+  await check("platform and workspace tokens don't open each other's doors", async () => {
+    assert.equal((await call("/platform/me", { token: W.token })).status, 401);
+    assert.equal((await call("/platform/workspaces", { token: W.token })).status, 401);
+    assert.equal((await call("/auth/me", { token: P.token })).status, 401);
+    assert.equal((await call("/admin/employees", { token: P.token })).status, 401);
+  });
+
+  const newWorkspace = {
+    companyName: "Platform Made Co",
+    workspace: P.slug,
+    name: "First Admin",
+    employeeCode: "boss1",
+    email: "boss@plat.test",
+    password: "Handed0ver",
+  };
+
+  await check("a platform admin creates a workspace whose admin must set their own password", async () => {
+    const res = await call("/platform/workspaces", { method: "POST", token: P.token, body: newWorkspace });
+    ok(res, 201);
+    assert.equal(res.body.admin.employeeCode, "BOSS1");
+    const login = await call("/auth/login", { method: "POST", body: { workspace: P.slug, identifier: "BOSS1", password: newWorkspace.password } });
+    ok(login);
+    assert.equal(login.body.user.role, "admin");
+    assert.equal(login.body.user.mustChangePassword, true);
+    const [row] = await ownerSql`select meta from audit_logs where action = 'tenant.created' and entity_id = ${res.body.workspace.id}`;
+    assert.equal(row.meta.createdBy, P.email);
+  });
+
+  await check("a taken workspace name is reported on its field", async () => {
+    const res = await call("/platform/workspaces", { method: "POST", token: P.token, body: { ...newWorkspace, email: "other@plat.test" } });
+    assert.equal(res.status, 409);
+    assert.ok(res.body.error.fields.workspace);
+  });
+
+  await check("the console lists every workspace with its head count", async () => {
+    const { body } = await call("/platform/workspaces", { token: P.token });
+    const made = body.workspaces.find((w) => w.slug === P.slug);
+    assert.deepEqual([made.people, made.admins, made.status], [1, 1, "active"]);
+    assert.ok(body.workspaces.some((w) => w.slug === W.slug));
+  });
+
+  await check("suspending a workspace blocks sign-in until it's reactivated", async () => {
+    const { body } = await call("/platform/workspaces", { token: P.token });
+    const id = body.workspaces.find((w) => w.slug === P.slug).id;
+    const signIn = () => call("/auth/login", { method: "POST", body: { workspace: P.slug, identifier: "BOSS1", password: newWorkspace.password } });
+    ok(await call(`/platform/workspaces/${id}/suspend`, { method: "POST", token: P.token }));
+    assert.equal((await signIn()).status, 403);
+    ok(await call(`/platform/workspaces/${id}/activate`, { method: "POST", token: P.token }));
+    ok(await signIn());
+  });
+
+  await check("disabling a platform admin ends their session", async () => {
+    await ownerSql`update app.platform_admins set is_active = false, token_version = token_version + 1 where email = ${P.email}`;
+    assert.equal((await call("/platform/me", { token: P.token })).status, 401);
+    assert.equal((await platformLogin(P.password)).status, 401);
+  });
+
   console.log("Maintenance");
   await check("the owner can delete someone who reviewed leave (cascade isn't blocked by guards)", async () => {
     // The workspace admin recorded (reviewed) leave above; removing them nulls reviewer_id on those rows.
@@ -303,7 +389,8 @@ try {
     assert.ok(row.n > 0);
   });
 } finally {
-  await ownerSql`delete from tenants where slug = ${W.slug}`;
+  await ownerSql`delete from tenants where slug in (${W.slug}, ${P.slug})`;
+  await ownerSql`delete from app.platform_admins where email = ${P.email}`;
   await Promise.all([ownerSql.end(), closeDb()]);
   console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}. Test workspace removed.`);
 }

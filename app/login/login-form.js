@@ -6,7 +6,7 @@ import { login } from "@/app/actions/auth";
 import { SubmitButton, useFormAction } from "@/components/client";
 import { Alert, Field } from "@/components/ui";
 
-export function LoginForm({ next, workspace }) {
+export function LoginForm({ next, workspace, signupOpen }) {
   const [state, onSubmit, pending] = useFormAction(login);
   const [show, setShow] = useState(false);
 
@@ -75,12 +75,14 @@ export function LoginForm({ next, workspace }) {
         Sign in <ArrowRight className="size-4" />
       </SubmitButton>
       <p className="text-center text-xs text-subtle">Forgot your password? Ask your admin to reset it.</p>
-      <p className="text-center text-sm text-muted">
-        New to Lasan People Pro?{" "}
-        <a href="/signup" className="font-medium text-brand-300 hover:text-brand-200">
-          Create a workspace
-        </a>
-      </p>
+      {signupOpen && (
+        <p className="text-center text-sm text-muted">
+          New to Lasan People Pro?{" "}
+          <a href="/signup" className="font-medium text-brand-300 hover:text-brand-200">
+            Create a workspace
+          </a>
+        </p>
+      )}
     </form>
   );
 }
