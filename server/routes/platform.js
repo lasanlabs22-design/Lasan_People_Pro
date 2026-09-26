@@ -16,10 +16,13 @@ import { workspaceSlug } from "./auth.js";
  * except createTenant, which opens the new workspace's own.
  */
 
+const ROLES = ["admin", "staff"];
+
 const publicAdmin = (a) => ({
   id: a.id,
   email: a.email,
   name: a.name,
+  role: a.role,
   mustChangePassword: a.must_change_password,
   lastLoginAt: a.last_login_at ?? null,
 });
@@ -61,6 +64,34 @@ platformAuthRoutes.post(
   },
 );
 
+// "Forgot password" from the sign-in page: asks one particular admin for a temporary password.
+// The answer is the same whether or not the details match, so it can't reveal who has an account.
+const resetRequests = createLimiter({ name: "platform:reset-request", windowMs: 60 * 60_000, max: 10 });
+
+platformAuthRoutes.post(
+  "/password-requests",
+  validate(
+    "json",
+    z.object({
+      email: z.email("Enter your email").trim().toLowerCase(),
+      adminEmail: z.email("Enter the admin's email").trim().toLowerCase(),
+    }),
+  ),
+  async (c) => {
+    const { email, adminEmail } = c.req.valid("json");
+    const ip = addressBlock(clientIp(c));
+    try {
+      await resetRequests.check(ip);
+    } catch (err) {
+      if (err.retryAfter) c.header("Retry-After", String(err.retryAfter));
+      throw err;
+    }
+    await resetRequests.hit(ip);
+    await platform.requestPasswordReset(email, adminEmail);
+    return c.json({ ok: true });
+  },
+);
+
 // Reachable while a temporary password is still in place; everything else waits for a new one.
 const PASSWORD_CHANGE_ALLOWED = new Set(["/platform/me", "/platform/password"]);
 
@@ -82,7 +113,17 @@ const requirePlatformAdmin = createMiddleware(async (c, next) => {
 export const platformRoutes = new Hono();
 platformRoutes.use("*", requirePlatformAdmin);
 
-platformRoutes.get("/me", (c) => c.json({ admin: publicAdmin(c.get("platformAdmin")) }));
+const requireAdminRole = createMiddleware(async (c, next) => {
+  if (c.get("platformAdmin").role !== "admin") throw forbidden("Only Lasan admins can manage the team");
+  await next();
+});
+
+platformRoutes.get("/me", async (c) => {
+  const me = c.get("platformAdmin");
+  // Admins see how many people are waiting on them for a temporary password.
+  const waiting = me.role === "admin" && !me.must_change_password ? (await platform.passwordRequestsFor(me.id)).length : 0;
+  return c.json({ admin: { ...publicAdmin(me), passwordRequests: waiting } });
+});
 
 platformRoutes.post(
   "/password",
@@ -153,7 +194,10 @@ for (const [path, status] of [["suspend", "suspended"], ["activate", "active"]])
   });
 }
 
-/* ------------------------------------ Team ------------------------------------ */
+/* ------------------------------ Team (admins only) ------------------------------ */
+
+// Staff never see the team: not its members, not the admins, not the password requests.
+for (const path of ["/team", "/team/*", "/password-requests", "/password-requests/*"]) platformRoutes.use(path, requireAdminRole);
 
 platformRoutes.get("/team", async (c) => {
   const rows = await platform.team();
@@ -162,6 +206,7 @@ platformRoutes.get("/team", async (c) => {
       id: a.id,
       email: a.email,
       name: a.name,
+      role: a.role,
       active: a.is_active,
       mustChangePassword: a.must_change_password,
       lastLoginAt: a.last_login_at,
@@ -178,34 +223,58 @@ platformRoutes.post(
     z.object({
       name: z.string().trim().min(2, "Enter their full name").max(120),
       email: z.email("Enter a valid email").trim().toLowerCase(),
+      role: z.enum(ROLES, "Choose Admin or Staff").default("staff"),
       password,
     }),
   ),
   async (c) => {
-    const { name, email, password: plain } = c.req.valid("json");
-    const id = await platform.createAdmin({ email, name, passwordHash: await hashPassword(plain), createdBy: c.get("platformAdmin").id });
-    return c.json({ member: { id, name, email } }, 201);
+    const { name, email, role, password: plain } = c.req.valid("json");
+    const id = await platform.createAdmin({ email, name, role, passwordHash: await hashPassword(plain), createdBy: c.get("platformAdmin").id });
+    return c.json({ member: { id, name, email, role } }, 201);
   },
 );
 
-// Someone else's account only: your own password is changed with /password, and deactivating
-// yourself could leave nobody able to sign in.
+// Someone else's account only: your own password is changed with /password, and demoting or
+// deactivating yourself could leave nobody able to manage the team.
 const colleague = (c) => {
   const { id } = c.req.valid("param");
-  if (id === c.get("platformAdmin").id) throw badRequest("Use Change password for your own account");
+  if (id === c.get("platformAdmin").id) throw badRequest("You can't do this to your own account");
   return id;
 };
 
+// A temporary password for a colleague; also answers any request they made for one.
 platformRoutes.post("/team/:id/reset-password", validate("param", uuidParam), validate("json", z.object({ password })), async (c) => {
   const id = colleague(c);
   const tv = await platform.setPassword(id, await hashPassword(c.req.valid("json").password), true);
-  if (tv == null) throw notFound("Staff member");
+  if (tv == null) throw notFound("Team member");
+  await platform.closePasswordRequest(id, c.get("platformAdmin").id);
+  return c.json({ ok: true });
+});
+
+platformRoutes.post("/team/:id/role", validate("param", uuidParam), validate("json", z.object({ role: z.enum(ROLES) })), async (c) => {
+  if (!(await platform.setRole(colleague(c), c.req.valid("json").role))) throw notFound("Team member");
   return c.json({ ok: true });
 });
 
 for (const [path, active] of [["deactivate", false], ["activate", true]]) {
   platformRoutes.post(`/team/:id/${path}`, validate("param", uuidParam), async (c) => {
-    if (!(await platform.setActive(colleague(c), active))) throw notFound("Staff member");
+    if (!(await platform.setActive(colleague(c), active))) throw notFound("Team member");
     return c.json({ ok: true, active });
   });
 }
+
+// Requests addressed to me, from people who forgot their password.
+platformRoutes.get("/password-requests", async (c) => {
+  const rows = await platform.passwordRequestsFor(c.get("platformAdmin").id);
+  return c.json({
+    requests: rows.map((r) => ({ id: r.id, requesterId: r.requester_id, name: r.name, email: r.email, role: r.role, createdAt: r.created_at })),
+  });
+});
+
+platformRoutes.post("/password-requests/:id/dismiss", validate("param", uuidParam), async (c) => {
+  const mine = await platform.passwordRequestsFor(c.get("platformAdmin").id);
+  const request = mine.find((r) => r.id === c.req.valid("param").id);
+  if (!request) throw notFound("Request");
+  await platform.closePasswordRequest(request.requester_id, c.get("platformAdmin").id);
+  return c.json({ ok: true });
+});

@@ -8,7 +8,7 @@ export function proxy(request) {
 
   // The platform console has its own session, independent of any workspace sign-in.
   if (pathname === "/platform" || pathname.startsWith("/platform/")) {
-    if (pathname === "/platform/logout") return NextResponse.next();
+    if (pathname === "/platform/logout" || pathname === "/platform/forgot") return NextResponse.next();
     const hasPlatform = Boolean(request.cookies.get("lasan_pro_platform")?.value);
     if (pathname === "/platform/login") {
       return hasPlatform ? NextResponse.redirect(new URL("/platform", request.url)) : NextResponse.next();

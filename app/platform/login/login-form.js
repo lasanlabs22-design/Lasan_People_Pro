@@ -20,6 +20,9 @@ export function PlatformLoginForm() {
       <SubmitButton pending={pending} size="lg" className="w-full" pendingText="Signing in…">
         Sign in <ArrowRight className="size-4" />
       </SubmitButton>
+      <a href="/platform/forgot" className="block text-center text-sm text-muted hover:text-fg">
+        Forgot password?
+      </a>
     </form>
   );
 }
