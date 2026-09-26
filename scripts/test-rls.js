@@ -88,6 +88,7 @@ try {
   A.id = regA.body.tenant.id;
   B.token = regB.body.token;
   B.id = regB.body.tenant.id;
+  A.adminId = regA.body.user.id;
 
   // Same employee ID in both companies: allowed, because uniqueness is per workspace.
   const empA = await call("/admin/employees", {
@@ -184,6 +185,33 @@ try {
     await asApp({ tenantId: A.id, userId: A.empId, role: "employee" }, (tx) =>
       expectPgError("42501", () => tx`update users set role = 'admin' where id = ${A.empId}`),
     );
+  });
+
+  await check("an employee can't switch off their own photo punch", async () => {
+    await asApp({ tenantId: A.id, userId: A.empId, role: "employee" }, (tx) =>
+      expectPgError("42501", () => tx`update users set photo_punch = not photo_punch where id = ${A.empId}`),
+    );
+  });
+
+  await check("punch photos: only your own, and no swapping them afterwards", async () => {
+    await asApp({ tenantId: A.id, userId: A.empId, role: "employee" }, async (tx) => {
+      const [punch] = await tx`insert into attendance (user_id, date, check_in_at) values (${A.empId}, '2026-03-03', now()) returning id`;
+      await tx`insert into attendance_photos (attendance_id, kind, user_id, photo) values (${punch.id}, 'in', ${A.empId}, 'data:image/jpeg;base64,AA==')`;
+      // Each refusal aborts its statement, so run them in savepoints to keep the transaction usable.
+      await expectPgError("42501", () =>
+        tx.savepoint((sp) => sp`insert into attendance_photos (attendance_id, kind, user_id, photo) values (${punch.id}, 'out', ${A.adminId}, 'data:image/jpeg;base64,AA==')`),
+      );
+      await expectPgError("42501", () =>
+        tx.savepoint((sp) => sp`update attendance_photos set photo = 'data:image/jpeg;base64,BB==' where attendance_id = ${punch.id}`),
+      );
+      const deleted = await tx`delete from attendance_photos where attendance_id = ${punch.id} returning kind`;
+      assert.equal(deleted.length, 0);
+    });
+  });
+
+  await check("tenant B's admin can't see A's punch photos", async () => {
+    const rows = await asApp({ tenantId: B.id, role: "admin" }, (tx) => tx`select 1 from attendance_photos where tenant_id = ${A.id}`);
+    assert.equal(rows.length, 0);
   });
 
   await check("an employee can't approve their own leave", async () => {

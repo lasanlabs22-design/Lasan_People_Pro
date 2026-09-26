@@ -189,6 +189,55 @@ try {
     assert.match(res.body.error.message, /Overlaps your pending Casual Leave/);
   });
 
+  console.log("Photo punch");
+  // A 1×1 JPEG; the API checks the format and size, not what's in the picture.
+  const PHOTO =
+    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=";
+  const snapper = await person("PIC1");
+  const peer = await person("PIC2");
+
+  await check("an admin can turn photo punch on and off per person", async () => {
+    const on = await call(`/admin/employees/${snapper.id}/photo-punch`, { method: "PUT", token: W.token, body: { enabled: true } });
+    ok(on);
+    assert.equal(on.body.employee.photoPunch, true);
+    assert.equal((await call("/attendance/today", { token: snapper.token })).body.photoRequired, true);
+    assert.equal((await call("/attendance/today", { token: peer.token })).body.photoRequired, false);
+    assert.equal((await call(`/admin/employees/${snapper.id}/photo-punch`, { method: "PUT", token: snapper.token, body: { enabled: false } })).status, 403);
+  });
+
+  await check("with photo punch on, punching without a photo is refused", async () => {
+    const res = await call("/attendance/check-in", { method: "POST", token: snapper.token, body: here });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, "photo_required");
+    assert.equal((await call("/attendance/check-in", { method: "POST", token: snapper.token, body: { ...here, photo: "data:text/plain;base64,aGk=" } })).status, 400);
+  });
+
+  let punchId;
+  await check("check-in and check-out store their photos", async () => {
+    const inRes = await call("/attendance/check-in", { method: "POST", token: snapper.token, body: { ...here, photo: PHOTO } });
+    ok(inRes, 201);
+    punchId = inRes.body.record.id;
+    assert.equal((await call("/attendance/check-out", { method: "POST", token: snapper.token, body: here })).status, 400);
+    ok(await call("/attendance/check-out", { method: "POST", token: snapper.token, body: { ...here, photo: PHOTO } }));
+    assert.deepEqual((await call("/attendance/today", { token: snapper.token })).body.record.photos, ["in", "out"]);
+    const roll = await call(`/admin/attendance?date=${today}`, { token: W.token });
+    assert.deepEqual(roll.body.rows.find((r) => r.id === snapper.id).record.photos, ["in", "out"]);
+  });
+
+  await check("a punch photo is visible to its owner and admins only", async () => {
+    const own = await call(`/attendance/${punchId}/photos/in`, { token: snapper.token });
+    ok(own);
+    assert.equal(own.body.photo, PHOTO);
+    ok(await call(`/attendance/${punchId}/photos/out`, { token: W.token }));
+    assert.equal((await call(`/attendance/${punchId}/photos/in`, { token: peer.token })).status, 404);
+  });
+
+  await check("people without photo punch still punch with location only", async () => {
+    ok(await call("/attendance/check-in", { method: "POST", token: peer.token, body: here }), 201);
+    ok(await call(`/admin/employees/${snapper.id}/photo-punch`, { method: "PUT", token: W.token, body: { enabled: false } }));
+    assert.equal((await call("/attendance/today", { token: snapper.token })).body.photoRequired, false);
+  });
+
   console.log("Profile");
   await check("date of birth must be real and at least 14 years ago", async () => {
     const save = (dateOfBirth) => call("/me/profile", { method: "PUT", token: worker.token, body: { dateOfBirth } });

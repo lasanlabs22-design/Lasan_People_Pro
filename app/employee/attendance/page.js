@@ -4,6 +4,7 @@ import { isMonth, missedCheckOut, todayIso } from "@/lib/dates";
 import { fmtDate, fmtDuration, fmtMinutes, fmtTime, punchLabel } from "@/lib/format";
 import { Legend, MonthCalendar, MonthNav } from "@/components/calendar";
 import { MissedCheckOut } from "@/components/missed-check-out";
+import { PunchPhotos } from "@/components/punch-photos";
 import { Alert, Card, CardHeader, EmptyState, PageHeader, StatCard } from "@/components/ui";
 
 export const metadata = { title: "Attendance" };
@@ -58,7 +59,10 @@ export default async function MyAttendance({ searchParams }) {
             {[...records].reverse().map((r) => (
               <div key={r.id} className="flex items-center gap-3 px-5 py-3 text-sm">
                 <MapPin className={`size-4 shrink-0 ${r.source === "geo" ? "text-emerald-300" : "text-amber-300"}`} />
-                <span className="flex-1">{fmtDate(r.date, { weekday: "short", day: "numeric", month: "short" })}</span>
+                <span className="flex flex-1 items-center gap-2">
+                  {fmtDate(r.date, { weekday: "short", day: "numeric", month: "short" })}
+                  <PunchPhotos record={r} />
+                </span>
                 <span className="tabular-nums text-muted">
                   {fmtTime(r.checkInAt)} → {missedCheckOut(r, today) ? <MissedCheckOut record={r} /> : fmtTime(r.checkOutAt)}
                 </span>

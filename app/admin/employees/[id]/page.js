@@ -5,6 +5,7 @@ import { load, ApiError } from "@/lib/api";
 import { fmtDate, fmtDays, fmtDuration, fmtRange, fmtTime, HALF_DAY_LABEL, punchLabel, STATUS_TONE, threeLetterMonths, TZ } from "@/lib/format";
 import { isMonth, isYear, leavesByDate, missedCheckOut, todayIso } from "@/lib/dates";
 import { MissedCheckOut } from "@/components/missed-check-out";
+import { PunchPhotos } from "@/components/punch-photos";
 import { deleteRating } from "@/app/actions/admin";
 import { Avatar, Badge, Card, CardHeader, EmptyState, Stars, cn } from "@/components/ui";
 import { ActionButton } from "@/components/client";
@@ -56,6 +57,7 @@ export default async function EmployeeDetail({ params, searchParams }) {
                 {e.status}
               </Badge>
               {e.role === "admin" && <Badge tone="brand">Admin</Badge>}
+              {e.photoPunch && e.role !== "admin" && <Badge tone="cyan">Photo punch</Badge>}
             </div>
             <p className="mt-1 text-sm text-muted">
               {[e.designation, e.department].filter(Boolean).join(" · ") || "No designation set"}
@@ -266,8 +268,11 @@ async function AttendanceTab({ id, month, base }) {
         <div className="mt-3 divide-y divide-white/[0.05]">
           {records.length === 0 && <EmptyState title="No punches this month" />}
           {records.map((r) => (
-            <div key={r.id} className="flex items-center justify-between px-5 py-3 text-sm">
-              <span>{fmtDate(r.date, { weekday: "short", day: "numeric", month: "short" })}</span>
+            <div key={r.id} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
+              <span className="flex flex-1 items-center gap-2">
+                {fmtDate(r.date, { weekday: "short", day: "numeric", month: "short" })}
+                <PunchPhotos record={r} />
+              </span>
               <span className="tabular-nums text-muted">
                 {fmtTime(r.checkInAt)} → {missedCheckOut(r, today) ? <MissedCheckOut record={r} editable /> : fmtTime(r.checkOutAt)}
               </span>

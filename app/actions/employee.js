@@ -39,9 +39,9 @@ export async function cancelLeave(id) {
   return run(() => api(`/leaves/${id}/cancel`, { method: "POST" }), "/employee/leaves");
 }
 
-export async function punch(kind, position) {
+export async function punch(kind, position, photo) {
   const path = kind === "out" ? "/attendance/check-out" : "/attendance/check-in";
-  return run(() => api(path, { method: "POST", body: position ?? {} }), "/employee/attendance");
+  return run(() => api(path, { method: "POST", body: { ...position, ...(photo ? { photo } : {}) } }), "/employee/attendance");
 }
 
 export async function saveProfile(_prev, fd) {

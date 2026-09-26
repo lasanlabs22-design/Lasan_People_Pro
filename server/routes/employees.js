@@ -169,6 +169,21 @@ employeeRoutes.post("/:id/reinstate", validate("param", uuidParam), async (c) =>
   return c.json({ employee: publicUser(updated) });
 });
 
+// Grant or remove selfie punching: while on, every check-in and check-out needs a live camera photo.
+employeeRoutes.put(
+  "/:id/photo-punch",
+  validate("param", uuidParam),
+  validate("json", z.object({ enabled: z.boolean() })),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const { enabled } = c.req.valid("json");
+    const [user] = await db.update(users).set({ photoPunch: enabled }).where(eq(users.id, id)).returning();
+    if (!user) throw notFound("Employee");
+    await audit(c.get("user").id, enabled ? "employee.photo_punch_on" : "employee.photo_punch_off", "user", id);
+    return c.json({ employee: publicUser(user) });
+  },
+);
+
 employeeRoutes.post("/:id/reset-password", validate("param", uuidParam), async (c) => {
   const { id } = c.req.valid("param");
   const user = await findUser(id);

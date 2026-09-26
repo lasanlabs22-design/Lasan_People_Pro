@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useSyncExternalStore, useTransition } from "react";
+import { useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Fingerprint, Loader2, LogIn, LogOut, MapPin, Navigation, Palmtree, ShieldAlert } from "lucide-react";
+import { Camera, CheckCircle2, Fingerprint, Loader2, LogIn, LogOut, MapPin, Navigation, Palmtree, ShieldAlert } from "lucide-react";
 import { punch } from "@/app/actions/employee";
 import Link from "./link";
 import { getPosition, nearestOffice } from "@/lib/geo";
 import { fmtDate, fmtDistance, fmtDuration, fmtTime, TZ } from "@/lib/format";
+import { CameraCapture } from "./camera-capture";
+import { Modal } from "./client";
+import { PunchPhotos } from "./punch-photos";
 import { Card, cn } from "./ui";
 
 // One-second ticking clock; null during SSR so server and client markup match.
@@ -24,31 +27,50 @@ function useNow() {
 }
 
 export function PunchCard({ today }) {
-  const { record, leave, geofenceMode, offices, date } = today;
+  const { record, leave, geofenceMode, offices, date, photoRequired } = today;
   const now = useNow();
   const [pending, start] = useTransition();
   const [error, setError] = useState(null);
   const router = useRouter();
   const [fix, setFix] = useState(null); // last known { latitude, longitude, accuracy }
+  const [camera, setCamera] = useState(false);
+  // Location is looked up while the person lines up their photo, so confirming is quick.
+  const locating = useRef(null);
 
   const state = !record ? "in" : !record.checkOutAt ? "out" : "done";
   const near = fix && offices.length ? nearestOffice(offices, fix.latitude, fix.longitude) : null;
   const inside = near && near.distance - Math.min(fix.accuracy ?? 0, 50) <= near.office.radiusMeters;
 
+  function locate() {
+    if (geofenceMode === "off" || locating.current) return;
+    locating.current = getPosition();
+    locating.current.catch(() => {}); // surfaced when the punch awaits it
+  }
+
   function go() {
     setError(null);
+    if (photoRequired) setCamera(true);
+    else submit(null);
+  }
+
+  function submit(photo) {
     start(async () => {
       let position;
       if (geofenceMode !== "off") {
         try {
-          position = await getPosition();
+          locate();
+          position = await locating.current;
           setFix(position);
         } catch (e) {
           setError(e.message);
+          setCamera(false);
           return;
+        } finally {
+          locating.current = null;
         }
       }
-      const res = await punch(state === "in" ? "in" : "out", position);
+      const res = await punch(state === "in" ? "in" : "out", position, photo);
+      setCamera(false);
       if (!res.ok) setError(res.error);
       else router.refresh();
     });
@@ -78,6 +100,11 @@ export function PunchCard({ today }) {
           <Stat label="Check out" value={fmtTime(record?.checkOutAt)} />
           <Stat label="Worked" value={worked ?? "—"} highlight={state === "out"} />
         </div>
+        {record?.photos?.length > 0 && (
+          <p className="mt-3 flex items-center justify-center gap-2 text-xs text-subtle">
+            Today&apos;s photos <PunchPhotos record={record} size={32} />
+          </p>
+        )}
 
         <div className="mt-6">
           {state === "done" ? (
@@ -116,23 +143,47 @@ export function PunchCard({ today }) {
                 </>
               ) : state === "in" ? (
                 <>
-                  <LogIn className="size-5" /> Check in
+                  {photoRequired ? <Camera className="size-5" /> : <LogIn className="size-5" />} Check in
                 </>
               ) : (
                 <>
-                  <LogOut className="size-5" /> Check out
+                  {photoRequired ? <Camera className="size-5" /> : <LogOut className="size-5" />} Check out
                 </>
               )}
             </button>
           )}
+          <Modal
+            open={camera}
+            onClose={() => {
+              if (pending) return;
+              setCamera(false);
+              locating.current = null;
+            }}
+            title={state === "out" ? "Check-out photo" : "Check-in photo"}
+            description="Take a live photo to mark your attendance."
+          >
+            {camera && (
+              <CameraCapture
+                onReady={locate}
+                onConfirm={submit}
+                busy={pending}
+                confirmLabel={pending ? (geofenceMode === "off" ? "Saving…" : "Locating you…") : state === "out" ? "Check out" : "Check in"}
+              />
+            )}
+          </Modal>
           {error && (
             <p className="mt-3 flex items-start gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-200">
               <ShieldAlert className="mt-0.5 size-4 shrink-0" /> {error}
             </p>
           )}
-          {geofenceMode !== "off" && state !== "done" && !(state === "in" && leave) && !error && (
-            <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-subtle">
-              <Fingerprint className="size-3.5" /> Your location is checked only when you punch.
+          {(geofenceMode !== "off" || photoRequired) && state !== "done" && !(state === "in" && leave) && !error && (
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-subtle">
+              <Fingerprint className="size-3.5 shrink-0" />
+              {photoRequired && geofenceMode !== "off"
+                ? "A live photo and your location are taken only when you punch."
+                : photoRequired
+                  ? "A live photo is taken only when you punch."
+                  : "Your location is checked only when you punch."}
             </p>
           )}
         </div>

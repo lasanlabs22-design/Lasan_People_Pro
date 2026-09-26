@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { and, asc, eq, gte, isNull, lte, ne } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { evaluateGeofence, formatDistance } from "../lib/geo.js";
 import { monthRange, todayIn, weekday, zonedDateTime } from "../lib/dates.js";
@@ -13,14 +13,45 @@ import { fullDayLeaveOn } from "../lib/leave.js";
 import { requireRole } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 
-const { attendance, officeLocations, users, leaveRequests, leaveTypes, holidays } = schema;
+const { attendance, attendancePhotos, officeLocations, users, leaveRequests, leaveTypes, holidays } = schema;
+
+// ~200 KB of base64 ≈ 150 KB image; the web app captures at 640px before upload.
+const MAX_PHOTO_CHARS = 200_000;
 
 const positionSchema = z.object({
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   accuracy: z.number().min(0).max(100_000).optional(),
   note: optionalText(300),
+  photo: z
+    .string()
+    .max(MAX_PHOTO_CHARS, "Photo is too large")
+    .regex(/^data:image\/(jpeg|webp);base64,[A-Za-z0-9+/=]+$/, "Photo must be a JPEG or WEBP image")
+    .optional(),
 });
+
+/** People with photo punch turned on must send a camera photo with every punch. */
+function requirePhoto(user, input) {
+  if (user.photoPunch && !input.photo) {
+    throw new ApiError(400, "Take a photo with your camera to punch.", "photo_required");
+  }
+}
+
+const savePhoto = (record, kind, photo) =>
+  photo ? db.insert(attendancePhotos).values({ attendanceId: record.id, kind, userId: record.userId, photo }) : null;
+
+/** Adds `photos: ["in", "out"]` (whichever were taken) to each attendance row, without loading the images. */
+export async function withPhotoKinds(records) {
+  const ids = records.filter(Boolean).map((r) => r.id);
+  if (!ids.length) return records;
+  const rows = await db
+    .select({ attendanceId: attendancePhotos.attendanceId, kind: attendancePhotos.kind })
+    .from(attendancePhotos)
+    .where(inArray(attendancePhotos.attendanceId, ids));
+  const kinds = new Map();
+  for (const r of rows) kinds.set(r.attendanceId, [...(kinds.get(r.attendanceId) ?? []), r.kind]);
+  return records.map((r) => r && { ...r, photos: (kinds.get(r.id) ?? []).sort() });
+}
 
 const activeOffices = () =>
   db
@@ -79,7 +110,8 @@ attendanceRoutes.get("/today", async (c) => {
     activeOffices(),
     fullDayLeaveOn(user.id, date),
   ]);
-  return c.json({ date, record: record ?? null, leave, geofenceMode, offices });
+  const [withPhotos] = await withPhotoKinds([record ?? null]);
+  return c.json({ date, record: withPhotos, leave, geofenceMode, offices, photoRequired: user.photoPunch });
 });
 
 attendanceRoutes.post("/check-in", validate("json", positionSchema), async (c) => {
@@ -89,6 +121,7 @@ attendanceRoutes.post("/check-in", validate("json", positionSchema), async (c) =
   // Punching in on a full day of approved leave would count the day as both worked and taken.
   const leave = await fullDayLeaveOn(user.id, date);
   if (leave) throw conflict(`You're on approved ${leave.name} today. Cancel it from My leaves first if you're working.`);
+  requirePhoto(user, input);
   const pos = await resolvePosition(input);
 
   const [record] = await db
@@ -108,6 +141,7 @@ attendanceRoutes.post("/check-in", validate("json", positionSchema), async (c) =
     .onConflictDoNothing({ target: [attendance.userId, attendance.date] })
     .returning();
   if (!record) throw conflict("You have already checked in today");
+  await savePhoto(record, "in", input.photo);
   return c.json({ record }, 201);
 });
 
@@ -115,6 +149,7 @@ attendanceRoutes.post("/check-out", validate("json", positionSchema), async (c) 
   const user = c.get("user");
   const input = c.req.valid("json");
   const date = todayIn();
+  requirePhoto(user, input);
   const pos = await resolvePosition(input);
 
   const [record] = await db
@@ -134,16 +169,33 @@ attendanceRoutes.post("/check-out", validate("json", positionSchema), async (c) 
     const [existing] = await db.select().from(attendance).where(and(eq(attendance.userId, user.id), eq(attendance.date, date)));
     throw conflict(existing ? "You have already checked out today" : "Check in first");
   }
+  await savePhoto(record, "out", input.photo);
   return c.json({ record });
 });
 
+// One punch photo. Row-level security limits employees to their own; admins see everyone's.
+attendanceRoutes.get(
+  "/:id/photos/:kind",
+  validate("param", uuidParam.extend({ kind: z.enum(["in", "out"]) })),
+  async (c) => {
+    const { id, kind } = c.req.valid("param");
+    const [row] = await db
+      .select({ photo: attendancePhotos.photo, takenAt: attendancePhotos.createdAt })
+      .from(attendancePhotos)
+      .where(and(eq(attendancePhotos.attendanceId, id), eq(attendancePhotos.kind, kind)));
+    if (!row) throw notFound("Photo");
+    return c.json(row);
+  },
+);
+
 export async function attendanceForMonth(userId, month) {
   const { start, end } = monthRange(month);
-  return db
+  const records = await db
     .select()
     .from(attendance)
     .where(and(eq(attendance.userId, userId), gte(attendance.date, start), lte(attendance.date, end)))
     .orderBy(asc(attendance.date));
+  return withPhotoKinds(records);
 }
 
 attendanceRoutes.get("/mine", validate("query", z.object({ month: monthQuery.optional() })), async (c) => {
@@ -173,11 +225,12 @@ export async function rollCall(date) {
         dateOfJoining: users.dateOfJoining,
         status: users.status,
         revokedAt: users.revokedAt,
+        photoPunch: users.photoPunch,
       })
       .from(users)
       .where(ne(users.role, "admin"))
       .orderBy(asc(users.name)),
-    db.select().from(attendance).where(eq(attendance.date, date)),
+    db.select().from(attendance).where(eq(attendance.date, date)).then(withPhotoKinds),
     db
       .select({
         userId: leaveRequests.userId,

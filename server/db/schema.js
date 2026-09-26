@@ -64,6 +64,8 @@ export const users = pgTable("users", {
   tokenVersion: integer("token_version").notNull().default(0),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  // Set by an admin: check-in and check-out must include a live camera photo.
+  photoPunch: boolean("photo_punch").notNull().default(false),
   ...timestamps,
 });
 
@@ -183,6 +185,20 @@ export const attendance = pgTable("attendance", {
   note: text("note"),
   ...timestamps,
 });
+
+// Selfie taken with a punch; one per attendance row and direction ("in" / "out").
+export const attendancePhotos = pgTable(
+  "attendance_photos",
+  {
+    attendanceId: uuid("attendance_id").notNull(),
+    kind: varchar("kind", { length: 3 }).notNull(),
+    tenantId: tenantId(),
+    userId: uuid("user_id").notNull(),
+    photo: text("photo").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.attendanceId, t.kind] })],
+);
 
 // Key/value org settings (geofence enforcement, work week...), one set per tenant.
 export const settings = pgTable(

@@ -6,6 +6,7 @@ import { fmtDate, fmtDistance, fmtDuration, fmtTime } from "@/lib/format";
 import { Alert, Avatar, Badge, Card, EmptyState, PageHeader, StatCard, Table, Td, Th } from "@/components/ui";
 import { DateJump } from "@/components/date-jump";
 import { MissedCheckOut } from "@/components/missed-check-out";
+import { PunchPhotos } from "@/components/punch-photos";
 
 export const metadata = { title: "Attendance" };
 
@@ -92,6 +93,7 @@ export default async function AttendancePage({ searchParams }) {
                     </p>
                   </div>
                 </Link>
+                <PunchPhotos record={r.record} size={32} />
                 {missedCheckOut(r.record, today) ? (
                   <MissedCheckOut record={r.record} editable />
                 ) : r.record ? (
@@ -113,6 +115,7 @@ export default async function AttendancePage({ searchParams }) {
                 <Th>Out</Th>
                 <Th className="hidden sm:table-cell">Worked</Th>
                 <Th className="hidden md:table-cell">Location</Th>
+                <Th>Photos</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -149,6 +152,13 @@ export default async function AttendancePage({ searchParams }) {
                           <MapPin className="size-3.5" /> Remote{r.record.checkInDistance != null && ` · ${fmtDistance(r.record.checkInDistance)} away`}
                         </span>
                       ))}
+                  </Td>
+                  <Td>
+                    {r.record?.photos?.length ? (
+                      <PunchPhotos record={r.record} size={32} />
+                    ) : (
+                      r.record && r.photoPunch && <span className="text-xs text-subtle">None</span>
+                    )}
                   </Td>
                 </tr>
               ))}

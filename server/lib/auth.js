@@ -50,6 +50,7 @@ export function publicUser(u) {
     dateOfJoining: u.dateOfJoining,
     status: u.status,
     mustChangePassword: u.mustChangePassword,
+    photoPunch: u.photoPunch,
     lastLoginAt: u.lastLoginAt,
     createdAt: u.createdAt,
   };

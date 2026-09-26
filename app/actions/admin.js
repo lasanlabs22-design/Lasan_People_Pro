@@ -53,6 +53,14 @@ export async function reinstateEmployee(id) {
   return run(() => api(`/admin/employees/${id}/reinstate`, { method: "POST" }), `/admin/employees/${id}`);
 }
 
+export async function setPhotoPunch(id, enabled) {
+  return run(
+    () => api(`/admin/employees/${id}/photo-punch`, { method: "PUT", body: { enabled } }),
+    `/admin/employees/${id}`,
+    "/admin/employees",
+  );
+}
+
 export async function resetEmployeePassword(id) {
   return run(() => api(`/admin/employees/${id}/reset-password`, { method: "POST" }));
 }

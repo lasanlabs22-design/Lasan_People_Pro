@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarPlus, KeyRound, Pencil, ShieldOff, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { CalendarPlus, Camera, CameraOff, KeyRound, Pencil, ShieldOff, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import {
   previewRecordedLeave,
   rateEmployee,
@@ -10,6 +10,7 @@ import {
   resetEmployeePassword,
   revokeEmployee,
   setAllocation,
+  setPhotoPunch,
   updateEmployee,
 } from "@/app/actions/admin";
 import { ActionButton, Modal, SubmitButton, useFormAction } from "@/components/client";
@@ -37,6 +38,28 @@ export function AccessActions({ employee }) {
       >
         <KeyRound className="size-3.5" /> Reset password
       </ActionButton>
+      {employee.role !== "admin" &&
+        (employee.photoPunch ? (
+          <ActionButton
+            variant="success"
+            size="sm"
+            action={setPhotoPunch.bind(null, employee.id, false)}
+            confirmText={`Stop requiring a photo from ${employee.name}? They'll punch with location only.`}
+            title="Photo punch is on: every check-in and check-out needs a live camera photo"
+          >
+            <Camera className="size-3.5" /> Photo punch on
+          </ActionButton>
+        ) : (
+          <ActionButton
+            variant="secondary"
+            size="sm"
+            action={setPhotoPunch.bind(null, employee.id, true)}
+            confirmText={`Require ${employee.name} to take a live camera photo at every check-in and check-out?`}
+            title="Require a live camera photo at every check-in and check-out"
+          >
+            <CameraOff className="size-3.5" /> Photo punch off
+          </ActionButton>
+        ))}
       {active ? (
         <ActionButton
           variant="danger"
