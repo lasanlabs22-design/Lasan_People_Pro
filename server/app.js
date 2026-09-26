@@ -19,6 +19,7 @@ const UNIQUE_FIELDS = {
   users_email_uq: ["email", "That email is already in use"],
   leave_types_code_uq: ["code", "That code is already in use"],
   holidays_date_uq: ["date", "There is already a holiday on that date"],
+  platform_admins_email_uq: ["email", "A Lasan staff member with that email already exists"],
 };
 
 /**

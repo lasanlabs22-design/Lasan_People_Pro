@@ -3,20 +3,26 @@ import { z } from "zod";
 import { createMiddleware } from "hono/factory";
 import { platform } from "../db/client.js";
 import { hashPassword, signPlatformToken, verifyPassword, verifyPlatformToken } from "../lib/auth.js";
-import { forbidden, notFound, unauthorized } from "../lib/errors.js";
-import { createTenant } from "../lib/tenants.js";
-import { uuidParam } from "../lib/validators.js";
+import { ApiError, badRequest, forbidden, notFound, unauthorized } from "../lib/errors.js";
+import { createTenant, isReservedSlug } from "../lib/tenants.js";
+import { password, uuidParam } from "../lib/validators.js";
 import { validate } from "../middleware/validate.js";
 import { addressBlock, clientIp, createLimiter } from "../middleware/rate-limit.js";
-import { newWorkspaceSchema } from "./auth.js";
+import { workspaceSlug } from "./auth.js";
 
 /*
- * The platform console: Lasan staff create and manage customer workspaces here. Platform admins
- * belong to no workspace, so nothing here runs in a tenant context except createTenant, which
- * opens the new workspace's own.
+ * The platform console: Lasan staff create and manage customer workspaces here, and manage their
+ * own team. Platform admins belong to no workspace, so nothing here runs in a tenant context
+ * except createTenant, which opens the new workspace's own.
  */
 
-const publicAdmin = (a) => ({ id: a.id, email: a.email, name: a.name, lastLoginAt: a.last_login_at ?? null });
+const publicAdmin = (a) => ({
+  id: a.id,
+  email: a.email,
+  name: a.name,
+  mustChangePassword: a.must_change_password,
+  lastLoginAt: a.last_login_at ?? null,
+});
 
 const WINDOW = 15 * 60_000;
 const perIp = createLimiter({ name: "platform:ip", windowMs: WINDOW, max: 20 });
@@ -30,7 +36,7 @@ platformAuthRoutes.post(
   "/login",
   validate("json", z.object({ email: z.string().trim().toLowerCase().min(1, "Required"), password: z.string().min(1, "Required") })),
   async (c) => {
-    const { email, password } = c.req.valid("json");
+    const { email, password: plain } = c.req.valid("json");
     const ip = addressBlock(clientIp(c));
     const account = email;
     for (const [limiter, key] of [[perIp, ip], [perAccount, account]]) {
@@ -44,7 +50,7 @@ platformAuthRoutes.post(
 
     const admin = await platform.adminByEmail(email);
     // Same bcrypt work whether or not the account exists, so emails can't be probed by timing.
-    const valid = await verifyPassword(password, admin?.password_hash ?? (dummyHash ??= await hashPassword("no-such-account")));
+    const valid = await verifyPassword(plain, admin?.password_hash ?? (dummyHash ??= await hashPassword("no-such-account")));
     if (!admin || !valid || !admin.is_active) {
       await Promise.all([perIp.hit(ip), perAccount.hit(account)]);
       throw unauthorized("Invalid email or password");
@@ -55,6 +61,9 @@ platformAuthRoutes.post(
   },
 );
 
+// Reachable while a temporary password is still in place; everything else waits for a new one.
+const PASSWORD_CHANGE_ALLOWED = new Set(["/platform/me", "/platform/password"]);
+
 /** Bearer platform token → the platform admin, re-checked so deactivation and resets apply at once. */
 const requirePlatformAdmin = createMiddleware(async (c, next) => {
   const header = c.req.header("authorization") ?? "";
@@ -63,6 +72,9 @@ const requirePlatformAdmin = createMiddleware(async (c, next) => {
   const admin = await platform.adminById(payload.sub);
   if (!admin || admin.token_version !== payload.tv) throw unauthorized("Session expired, please sign in again");
   if (!admin.is_active) throw forbidden("This platform account is disabled");
+  if (admin.must_change_password && !PASSWORD_CHANGE_ALLOWED.has(c.req.path)) {
+    throw new ApiError(403, "Set your own password before continuing", "password_change_required");
+  }
   c.set("platformAdmin", admin);
   await next();
 });
@@ -71,6 +83,35 @@ export const platformRoutes = new Hono();
 platformRoutes.use("*", requirePlatformAdmin);
 
 platformRoutes.get("/me", (c) => c.json({ admin: publicAdmin(c.get("platformAdmin")) }));
+
+platformRoutes.post(
+  "/password",
+  validate("json", z.object({ currentPassword: z.string().min(1, "Required"), newPassword: password })),
+  async (c) => {
+    const admin = c.get("platformAdmin");
+    const { currentPassword, newPassword } = c.req.valid("json");
+    if (!(await verifyPassword(currentPassword, admin.password_hash))) {
+      throw badRequest("Current password is incorrect", { currentPassword: "Current password is incorrect" });
+    }
+    if (currentPassword === newPassword) {
+      throw badRequest("Choose a password you haven't used here", { newPassword: "Must differ from the current password" });
+    }
+    // Every other session ends; this one continues with a fresh token.
+    const tokenVersion = await platform.setPassword(admin.id, await hashPassword(newPassword), false);
+    return c.json({ token: await signPlatformToken({ ...admin, token_version: tokenVersion }) });
+  },
+);
+
+/* ---------------------------------- Workspaces ---------------------------------- */
+
+const newWorkspaceSchema = z.object({
+  companyName: z.string().trim().min(2, "Enter the company name").max(80),
+  workspace: workspaceSlug.refine((s) => !isReservedSlug(s), "That name is reserved, pick another"),
+  name: z.string().trim().min(2, "Enter the full name").max(120),
+  email: z.email("Enter a valid email").trim().toLowerCase(),
+  employeeCode: z.string().trim().regex(/^[A-Za-z0-9_-]{2,32}$/, "2–32 letters, numbers, - or _").default("ADMIN"),
+  password,
+});
 
 platformRoutes.get("/workspaces", async (c) => {
   const rows = await platform.workspaces();
@@ -109,5 +150,62 @@ for (const [path, status] of [["suspend", "suspended"], ["activate", "active"]])
   platformRoutes.post(`/workspaces/:id/${path}`, validate("param", uuidParam), async (c) => {
     if (!(await platform.setWorkspaceStatus(c.req.valid("param").id, status))) throw notFound("Workspace");
     return c.json({ ok: true, status });
+  });
+}
+
+/* ------------------------------------ Team ------------------------------------ */
+
+platformRoutes.get("/team", async (c) => {
+  const rows = await platform.team();
+  return c.json({
+    team: rows.map((a) => ({
+      id: a.id,
+      email: a.email,
+      name: a.name,
+      active: a.is_active,
+      mustChangePassword: a.must_change_password,
+      lastLoginAt: a.last_login_at,
+      createdAt: a.created_at,
+      createdBy: a.created_by_name,
+    })),
+  });
+});
+
+platformRoutes.post(
+  "/team",
+  validate(
+    "json",
+    z.object({
+      name: z.string().trim().min(2, "Enter their full name").max(120),
+      email: z.email("Enter a valid email").trim().toLowerCase(),
+      password,
+    }),
+  ),
+  async (c) => {
+    const { name, email, password: plain } = c.req.valid("json");
+    const id = await platform.createAdmin({ email, name, passwordHash: await hashPassword(plain), createdBy: c.get("platformAdmin").id });
+    return c.json({ member: { id, name, email } }, 201);
+  },
+);
+
+// Someone else's account only: your own password is changed with /password, and deactivating
+// yourself could leave nobody able to sign in.
+const colleague = (c) => {
+  const { id } = c.req.valid("param");
+  if (id === c.get("platformAdmin").id) throw badRequest("Use Change password for your own account");
+  return id;
+};
+
+platformRoutes.post("/team/:id/reset-password", validate("param", uuidParam), validate("json", z.object({ password })), async (c) => {
+  const id = colleague(c);
+  const tv = await platform.setPassword(id, await hashPassword(c.req.valid("json").password), true);
+  if (tv == null) throw notFound("Staff member");
+  return c.json({ ok: true });
+});
+
+for (const [path, active] of [["deactivate", false], ["activate", true]]) {
+  platformRoutes.post(`/team/:id/${path}`, validate("param", uuidParam), async (c) => {
+    if (!(await platform.setActive(colleague(c), active))) throw notFound("Staff member");
+    return c.json({ ok: true, active });
   });
 }

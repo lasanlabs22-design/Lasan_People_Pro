@@ -52,7 +52,7 @@ const FIXED_HOLIDAYS = [
 ];
 
 // Names that would read as ours rather than a customer's.
-const RESERVED_SLUGS = new Set(["admin", "api", "app", "www", "login", "signup", "support", "help", "status", "system"]);
+const RESERVED_SLUGS = new Set(["admin", "api", "app", "www", "login", "signup", "platform", "lasan", "support", "help", "status", "system"]);
 export const isReservedSlug = (slug) => RESERVED_SLUGS.has(slug.toLowerCase());
 
 /**

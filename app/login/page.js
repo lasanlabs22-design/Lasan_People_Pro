@@ -2,9 +2,7 @@ import { CalendarCheck2, MapPinned, ShieldCheck, Sparkles } from "lucide-react";
 import { Logo } from "@/components/brand";
 import { Alert } from "@/components/ui";
 import { PoweredBy } from "@/components/powered-by";
-import { getWorkspace } from "@/lib/session";
-import { publicSignupEnabled } from "@/server/env";
-import { LoginForm } from "./login-form";
+import { getWorkspace } from "@/lib/session";import { LoginForm } from "./login-form";
 
 export const metadata = { title: "Sign in" };
 
@@ -56,12 +54,15 @@ export default async function LoginPage({ searchParams }) {
           <Logo className="mb-10 lg:hidden" />
           <h2 className="font-display text-3xl font-semibold tracking-tight">Welcome back</h2>
           <p className="mt-2 text-sm text-muted">
-            Sign in with your company&apos;s workspace name and the employee ID or email your admin shared with you.
+            Sign in with your company&apos;s workspace name and the employee ID or email you were given.
           </p>
           {reason === "revoked" && (
             <Alert className="mt-6">Your access has been revoked. Contact your administrator if this is a mistake.</Alert>
           )}
-          <LoginForm next={typeof next === "string" ? next : ""} workspace={prefill} signupOpen={publicSignupEnabled()} />
+          {reason === "suspended" && (
+            <Alert className="mt-6">Your company&apos;s workspace is suspended. Contact Lasan to have it reactivated.</Alert>
+          )}
+          <LoginForm next={typeof next === "string" ? next : ""} workspace={prefill} />
         </div>
         <PoweredBy />
       </section>

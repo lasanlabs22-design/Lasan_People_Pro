@@ -104,6 +104,20 @@ export const platform = {
     return row ?? null;
   },
   signedIn: (id) => root().pool`select app.platform_admin_signed_in(${id})`,
+  team: () => root().pool`select * from app.platform_admins()`,
+  async createAdmin({ email, name, passwordHash, createdBy }) {
+    const [row] = await root().pool`select app.platform_admin_create(${email}, ${name}, ${passwordHash}, ${createdBy}) as id`;
+    return row.id;
+  },
+  /** Returns the new token version, or null if there's no such admin. */
+  async setPassword(id, passwordHash, mustChange) {
+    const [row] = await root().pool`select app.platform_admin_set_password(${id}, ${passwordHash}, ${mustChange}) as tv`;
+    return row.tv;
+  },
+  async setActive(id, active) {
+    const [row] = await root().pool`select app.platform_admin_set_active(${id}, ${active}) as ok`;
+    return row.ok;
+  },
   workspaces: () => root().pool`select * from app.platform_workspaces()`,
   async setWorkspaceStatus(id, status) {
     const [row] = await root().pool`select app.platform_set_workspace_status(${id}, ${status}) as ok`;

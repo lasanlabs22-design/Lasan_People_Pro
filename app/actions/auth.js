@@ -40,29 +40,6 @@ export async function login(_prev, formData) {
   redirect(safeNext(formData.get("next"), res.user.role) ?? homeFor(res.user.role));
 }
 
-export async function register(_prev, formData) {
-  const field = (k) => String(formData.get(k) ?? "").trim();
-  if (formData.get("password") !== formData.get("confirmPassword")) {
-    return { ok: false, error: "Passwords don't match", fields: { confirmPassword: "Doesn't match the password" } };
-  }
-  const body = {
-    companyName: field("companyName"),
-    workspace: field("workspace").toLowerCase(),
-    name: field("name"),
-    email: field("email"),
-    employeeCode: field("employeeCode") || undefined,
-    password: String(formData.get("password") ?? ""),
-  };
-  let res;
-  try {
-    res = await api("/auth/register", { method: "POST", body, token: null, clientIp: await visitorIp() });
-  } catch (err) {
-    return formError(err);
-  }
-  await setSession(res.token, res.user.role, res.tenant.slug);
-  redirect("/admin/settings?welcome=1");
-}
-
 export async function changePassword(_prev, formData) {
   const currentPassword = String(formData.get("currentPassword") ?? "");
   const newPassword = String(formData.get("newPassword") ?? "");

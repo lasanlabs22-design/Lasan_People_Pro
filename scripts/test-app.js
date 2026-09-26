@@ -11,11 +11,9 @@ import bcrypt from "bcryptjs";
 import postgres from "postgres";
 import { getApp } from "../server/app.js";
 import { closeDb } from "../server/db/client.js";
+import { createTenant } from "../server/lib/tenants.js";
 import { addDays, todayIn, weekday } from "../server/lib/dates.js";
 import { sslFor } from "./lib/ssl.js";
-
-// The test workspace is made through self-serve sign-up, which is off by default.
-process.env.ALLOW_PUBLIC_SIGNUP = "true";
 
 const app = getApp();
 const suffix = randomBytes(3).toString("hex");
@@ -77,11 +75,10 @@ async function person(code, extra = {}) {
 
 
 try {
-  const reg = await call("/auth/register", {
-    method: "POST",
-    body: { companyName: W.company, workspace: W.slug, name: "Admin", email: "admin@app.test", password: PASSWORD },
-  });
-  ok(reg, 201);
+  // Made the way the platform console makes workspaces, then signed in to normally.
+  await createTenant({ slug: W.slug, companyName: W.company, admin: { name: "Admin", email: "admin@app.test", employeeCode: "ADMIN", password: PASSWORD } });
+  const reg = await call("/auth/login", { method: "POST", body: { workspace: W.slug, identifier: "ADMIN", password: PASSWORD } });
+  ok(reg);
   W.token = reg.body.token;
   W.adminId = reg.body.user.id;
 
@@ -304,17 +301,14 @@ try {
   await ownerSql`insert into app.platform_admins (email, name, password_hash) values (${P.email}, 'Platform Tester', ${await bcrypt.hash(P.password, 4)})`;
   const platformLogin = (password) => call("/platform/login", { method: "POST", body: { email: P.email, password } });
 
-  await check("self-serve sign-up is refused unless turned on", async () => {
-    process.env.ALLOW_PUBLIC_SIGNUP = "false";
-    try {
-      const res = await call("/auth/register", {
-        method: "POST",
-        body: { companyName: "Nope", workspace: `nope-${suffix}`, name: "Nope", email: "nope@app.test", password: PASSWORD },
-      });
-      assert.equal(res.status, 403);
-    } finally {
-      process.env.ALLOW_PUBLIC_SIGNUP = "true";
-    }
+  await check("there is no self-serve way to create a workspace", async () => {
+    const res = await call("/auth/register", {
+      method: "POST",
+      body: { companyName: "Nope", workspace: `nope-${suffix}`, name: "Nope", email: "nope@app.test", password: PASSWORD },
+    });
+    assert.notEqual(res.status, 201);
+    const [row] = await ownerSql`select count(*)::int as n from tenants where slug = ${`nope-${suffix}`}`;
+    assert.equal(row.n, 0);
   });
 
   await check("platform sign-in checks the password", async () => {
@@ -375,6 +369,64 @@ try {
     ok(await signIn());
   });
 
+  const colleague = { name: "New Colleague", email: `colleague-${suffix}@app.test`, password: "Temp0rary1" };
+  const colleagueLogin = (password) => call("/platform/login", { method: "POST", body: { email: colleague.email, password } });
+
+  await check("a staff member adds a colleague, who must set their own password first", async () => {
+    const added = await call("/platform/team", { method: "POST", token: P.token, body: colleague });
+    ok(added, 201);
+    colleague.id = added.body.member.id;
+    assert.equal((await call("/platform/team", { method: "POST", token: P.token, body: colleague })).status, 409);
+
+    const login = await colleagueLogin(colleague.password);
+    ok(login);
+    assert.equal(login.body.admin.mustChangePassword, true);
+    const blocked = await call("/platform/workspaces", { token: login.body.token });
+    assert.equal(blocked.status, 403);
+    assert.equal(blocked.body.error.code, "password_change_required");
+
+    const changed = await call("/platform/password", {
+      method: "POST",
+      token: login.body.token,
+      body: { currentPassword: colleague.password, newPassword: "MyOwnPass9" },
+    });
+    ok(changed);
+    assert.equal((await call("/platform/me", { token: login.body.token })).status, 401, "the old token is retired");
+    ok(await call("/platform/workspaces", { token: changed.body.token }));
+    colleague.password = "MyOwnPass9";
+    colleague.token = changed.body.token;
+  });
+
+  await check("the team list shows who added whom", async () => {
+    const { body } = await call("/platform/team", { token: P.token });
+    const row = body.team.find((m) => m.email === colleague.email);
+    assert.equal(row.createdBy, "Platform Tester");
+    assert.equal(row.mustChangePassword, false);
+  });
+
+  await check("resetting a colleague's password signs them out and makes it temporary again", async () => {
+    ok(await call(`/platform/team/${colleague.id}/reset-password`, { method: "POST", token: P.token, body: { password: "Reset0Pass" } }));
+    assert.equal((await call("/platform/me", { token: colleague.token })).status, 401);
+    const login = await colleagueLogin("Reset0Pass");
+    ok(login);
+    assert.equal(login.body.admin.mustChangePassword, true);
+  });
+
+  await check("staff can deactivate a colleague but not themselves", async () => {
+    const { body } = await call("/platform/me", { token: P.token });
+    assert.equal((await call(`/platform/team/${body.admin.id}/deactivate`, { method: "POST", token: P.token })).status, 400);
+    ok(await call(`/platform/team/${colleague.id}/deactivate`, { method: "POST", token: P.token }));
+    assert.equal((await colleagueLogin("Reset0Pass")).status, 401);
+    ok(await call(`/platform/team/${colleague.id}/activate`, { method: "POST", token: P.token }));
+    ok(await colleagueLogin("Reset0Pass"));
+  });
+
+  await check("changing your own password needs the current one", async () => {
+    const res = await call("/platform/password", { method: "POST", token: P.token, body: { currentPassword: "nope", newPassword: "Another1Pass" } });
+    assert.equal(res.status, 400);
+    assert.ok(res.body.error.fields.currentPassword);
+  });
+
   await check("disabling a platform admin ends their session", async () => {
     await ownerSql`update app.platform_admins set is_active = false, token_version = token_version + 1 where email = ${P.email}`;
     assert.equal((await call("/platform/me", { token: P.token })).status, 401);
@@ -390,7 +442,7 @@ try {
   });
 } finally {
   await ownerSql`delete from tenants where slug in (${W.slug}, ${P.slug})`;
-  await ownerSql`delete from app.platform_admins where email = ${P.email}`;
+  await ownerSql`delete from app.platform_admins where email in (${P.email}, ${`colleague-${suffix}@app.test`})`;
   await Promise.all([ownerSql.end(), closeDb()]);
   console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}. Test workspace removed.`);
 }

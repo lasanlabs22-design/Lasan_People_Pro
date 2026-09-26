@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const PUBLIC = new Set(["/login", "/signup"]);
+const PUBLIC = new Set(["/login"]);
 
 // Optimistic routing only. Every API call re-checks the token, tenant, role and revocation server-side.
 export function proxy(request) {
@@ -38,5 +38,5 @@ export function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/signup", "/admin/:path*", "/employee/:path*", "/change-password", "/platform", "/platform/:path*"],
+  matcher: ["/", "/login", "/admin/:path*", "/employee/:path*", "/change-password", "/platform", "/platform/:path*"],
 };

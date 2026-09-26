@@ -6,8 +6,6 @@ import { signToken, verifyPassword, hashPassword, publicUser } from "../lib/auth
 import { badRequest, unauthorized, forbidden } from "../lib/errors.js";
 import { password } from "../lib/validators.js";
 import { audit } from "../lib/audit.js";
-import { createTenant, isReservedSlug } from "../lib/tenants.js";
-import { publicSignupEnabled } from "../env.js";
 import { inTenant, requireAuth } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 import { addressBlock, createLimiter, clientIp } from "../middleware/rate-limit.js";
@@ -32,8 +30,6 @@ const perAccountIp = createLimiter({ name: "login:account-ip", windowMs: WINDOW,
 const perAccount = createLimiter({ name: "login:account", windowMs: WINDOW, max: 50 });
 const perIp = createLimiter({ name: "login:ip", windowMs: WINDOW, max: 100 });
 const trustedAddress = createLimiter({ name: "login:trusted", windowMs: 30 * 24 * 60 * 60_000, max: 1 });
-// New workspaces per visitor.
-const signups = createLimiter({ name: "signup:ip", windowMs: 60 * 60_000, max: 5 });
 
 // Checked when no such account exists, so a miss costs the same bcrypt work as a wrong
 // password and response time doesn't reveal which IDs and emails are real.
@@ -107,39 +103,6 @@ authRoutes.post(
       response = c.json({ token: await signToken(updated), user: publicUser(updated), tenant: publicTenant(tenant) });
     });
     return response;
-  },
-);
-
-// A new workspace and its first admin; used by self-serve sign-up and the platform console.
-export const newWorkspaceSchema = z.object({
-  companyName: z.string().trim().min(2, "Enter the company name").max(80),
-  workspace: workspaceSlug.refine((s) => !isReservedSlug(s), "That name is reserved, pick another"),
-  name: z.string().trim().min(2, "Enter the full name").max(120),
-  email: z.email("Enter a valid email").trim().toLowerCase(),
-  employeeCode: z.string().trim().regex(/^[A-Za-z0-9_-]{2,32}$/, "2–32 letters, numbers, - or _").default("ADMIN"),
-  password,
-});
-
-// Self-serve: a company creates its own workspace and becomes its first admin. Off unless
-// ALLOW_PUBLIC_SIGNUP=true; normally Lasan creates workspaces from the platform console.
-authRoutes.post(
-  "/register",
-  validate("json", newWorkspaceSchema),
-  async (c) => {
-    if (!publicSignupEnabled()) {
-      throw forbidden("New workspaces are set up by Lasan. Contact us to get one.");
-    }
-    const input = c.req.valid("json");
-    const ip = addressBlock(clientIp(c));
-    await checkLimits(c, [[signups, ip]]);
-    await signups.hit(ip);
-
-    const { tenant, user } = await createTenant({
-      slug: input.workspace,
-      companyName: input.companyName,
-      admin: { name: input.name, email: input.email, employeeCode: input.employeeCode, password: input.password },
-    });
-    return c.json({ token: await signToken(user), user: publicUser(user), tenant: publicTenant(tenant) }, 201);
   },
 );
 

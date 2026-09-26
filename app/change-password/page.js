@@ -23,7 +23,7 @@ export default async function ChangePasswordPage() {
           </h1>
           <p className="mt-1.5 text-sm text-muted">
             {first
-              ? "Before you continue, replace the temporary password your admin gave you with one only you know."
+              ? "Before you continue, replace the temporary password you were given with one only you know."
               : "Pick a new password with at least 8 characters, including a letter and a number."}
           </p>
           <ChangePasswordForm cancelHref={first ? null : user.role === "admin" ? "/admin" : "/employee/profile"} />

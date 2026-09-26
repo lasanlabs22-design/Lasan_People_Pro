@@ -1,5 +1,5 @@
 /**
- * Creates a workspace and its first admin from the terminal (same code path as /signup).
+ * Creates a workspace and its first admin from the terminal (same code path as the platform console).
  *
  *   npm run tenant:create -- --slug acme --company "Acme Tools" --name "Priya Rao" \
  *     --email priya@acme.in --password "Secret123" [--code ADMIN]

@@ -33,15 +33,15 @@ browser on a phone or a computer.
 
 ## 1. Getting started (everyone)
 
-### Creating your company's workspace (first admin only)
+### Getting your company's workspace (first admin only)
 
-1. Open the Lasan People web address and select **Create a workspace** under the sign-in form.
-2. Enter your **Company name**. A **Workspace name** is suggested from it, for example `acme-tools`.
-   Your team types this name to sign in, so keep it short. It can use lowercase letters, numbers and hyphens.
-3. Enter your name, work email and a password, then select **Create workspace**.
+Workspaces are set up by Lasan; there is no sign-up page. When your company joins, Lasan sends its first admin
+a login with the **workspace name** (for example `acme-tools`), an **employee ID** and a **temporary password**.
 
-You're signed in as the workspace's admin and taken to **Settings** to finish setting up. Continue with the
-[first-time setup checklist](#31-first-time-setup-checklist).
+1. Sign in with those details (see [Signing in](#signing-in)).
+2. Replace the temporary password with your own.
+3. You land on the **Overview**, with a note on what to set up first. Continue with the
+   [first-time setup checklist](#31-first-time-setup-checklist).
 
 ### Signing in
 
@@ -347,7 +347,10 @@ Select a holiday on the calendar or in the list to edit it, or use the bin icon 
 - Profile: photo (resized client-side), phone, DOB, address, blood group, emergency contact; change password
 
 **Workspaces**
-- Self-serve sign-up creates a workspace with its first admin and the default leave policy, holidays and settings
+- Created only by Lasan staff from the platform console (`/platform`), with the first admin and the default
+  leave policy, holidays and settings; no public sign-up
+- Platform console: create, suspend and reactivate workspaces; manage the Lasan team (add staff with a temporary
+  password, reset passwords, deactivate); every staff member can change their own password
 - Sign-in by workspace name + employee ID/email; the same employee ID or email can exist in different workspaces
 - Workspace shown in the menu; login messages for new employees include a pre-filled sign-in link
 
@@ -357,7 +360,9 @@ Select a holiday on the calendar or in the list to edit it, or use the bin icon 
   resetting or changing a password signs the user out everywhere immediately
 - Every API route re-checks the user and workspace in the database (status + token version + role);
   `proxy.js` is only an optimistic redirect
-- Login and sign-up rate-limited; no user enumeration; append-only audit log
+- Workspace and platform sign-in rate-limited; no user enumeration; append-only audit log
+- Platform staff live outside every workspace (private `app` schema, reached only through definer functions)
+  and use separate tokens: a workspace token can't open the console, and a console token can't open a workspace
 - Geofence is enforced server-side (haversine distance; GPS accuracy forgiven up to 50 m)
 
 ## Multi-tenancy & row-level security
@@ -416,10 +421,26 @@ PG_SUPERUSER_URL="postgresql://postgres:…@…proxy.rlwy.net:PORT/railway" npm 
 
 npm run db:migrate                  # schema, policies, triggers, grants
 npm run test:rls                    # optional: prove tenant isolation (creates + deletes 2 test workspaces)
-npm run dev                         # http://localhost:3000 → "Create a workspace"
+npm run dev                         # http://localhost:3000
 ```
 
-You can also create a workspace from the terminal:
+### Platform console (Lasan staff)
+
+Workspaces are created at **`/platform`**. The first Lasan staff account has to come from the terminal (it uses
+the owner connection, so the web app can never create one on its own); after that, staff add each other from the
+console's **Lasan team** page.
+
+```bash
+npm run platform:admin -- --email you@lasan.in --name "Your Name" --password "Secret123"   # create
+npm run platform:admin -- --email you@lasan.in --password "NewSecret456"                   # reset a password
+npm run platform:admin -- --email you@lasan.in --disable                                   # or --enable
+npm run platform:admin -- --list
+```
+
+Then sign in at `/platform/login`, select **Create workspace**, and send the new company's admin the login the
+console shows. They must replace the password on first sign-in.
+
+A workspace can also be created from the terminal:
 
 ```bash
 npm run tenant:create -- --slug lasan --company "Lasan" --name "Your Name" --email you@lasan.in --password "Secret123"
@@ -465,7 +486,8 @@ column, `ENABLE`/`FORCE ROW LEVEL SECURITY`, policies, and a grant to `lasan_pro
 app/                     Next.js routes
   admin/                 overview, employees/[id], leaves, attendance, holidays, settings
   employee/              dashboard, leaves, attendance, holidays, profile
-  login/, signup/        workspace sign-in and self-serve workspace creation
+  login/                 workspace sign-in (signup/ only redirects here)
+  platform/              Lasan staff console: workspaces, Lasan team, change password
   api/[...path]/         the API for external clients (Bearer token)
   actions/               server actions → API
 components/              UI kit, calendar, punch card, shell
