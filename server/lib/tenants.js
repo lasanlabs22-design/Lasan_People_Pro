@@ -52,15 +52,17 @@ const FIXED_HOLIDAYS = [
 ];
 
 // Names that would read as ours rather than a customer's.
-const RESERVED_SLUGS = new Set(["admin", "api", "app", "www", "login", "signup", "support", "help", "status", "system"]);
+const RESERVED_SLUGS = new Set(["admin", "api", "app", "www", "login", "signup", "platform", "lasan", "support", "help", "status", "system"]);
 export const isReservedSlug = (slug) => RESERVED_SLUGS.has(slug.toLowerCase());
 
 /**
  * Creates a workspace with its first admin and default policy, all in one transaction.
  * The tenant id is chosen up front and placed in the context, which is what lets RLS accept the
  * tenant row and everything that hangs off it.
+ * `createdBy` names the platform admin who set it up; their chosen password is then temporary,
+ * so the new admin must replace it on first sign-in.
  */
-export async function createTenant({ slug, companyName, admin }) {
+export async function createTenant({ slug, companyName, admin, createdBy }) {
   const tenantId = randomUUID();
   const adminId = randomUUID();
   return withTenant({ tenantId, userId: adminId, role: "admin" }, async () => {
@@ -77,7 +79,7 @@ export async function createTenant({ slug, companyName, admin }) {
         role: "admin",
         designation: "Administrator",
         passwordHash: await hashPassword(admin.password),
-        mustChangePassword: false,
+        mustChangePassword: Boolean(createdBy),
       })
       .returning();
     await db.insert(schema.profiles).values({ userId: user.id });
@@ -89,7 +91,7 @@ export async function createTenant({ slug, companyName, admin }) {
       .values(FIXED_HOLIDAYS.map(([md, name]) => ({ date: `${year}-${md}`, name, createdBy: user.id })));
     await db.insert(schema.settings).values({ key: "companyName", value: companyName });
 
-    await audit(user.id, "tenant.created", "tenant", tenantId, { slug: tenant.slug });
+    await audit(user.id, "tenant.created", "tenant", tenantId, { slug: tenant.slug, ...(createdBy ? { createdBy } : {}) });
     return { tenant, user };
   });
 }

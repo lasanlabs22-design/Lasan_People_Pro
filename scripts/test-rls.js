@@ -10,6 +10,7 @@ import { randomBytes } from "node:crypto";
 import postgres from "postgres";
 import { getApp } from "../server/app.js";
 import { closeDb } from "../server/db/client.js";
+import { createTenant } from "../server/lib/tenants.js";
 import { sslFor } from "./lib/ssl.js";
 
 const app = getApp();
@@ -74,16 +75,15 @@ async function expectPgError(code, fn) {
 
 try {
   console.log("Setting up two workspaces…");
-  const regA = await call("/auth/register", {
-    method: "POST",
-    body: { companyName: A.company, workspace: A.slug, name: "Admin A", email: "admin@a.test", password: PASSWORD },
-  });
-  assert.equal(regA.status, 201, JSON.stringify(regA.body));
-  const regB = await call("/auth/register", {
-    method: "POST",
-    body: { companyName: B.company, workspace: B.slug, name: "Admin B", email: "admin@b.test", password: PASSWORD },
-  });
-  assert.equal(regB.status, 201, JSON.stringify(regB.body));
+  // Workspaces are made the way the platform console makes them, then signed in to normally.
+  const setUp = async (w, name, email) => {
+    await createTenant({ slug: w.slug, companyName: w.company, admin: { name, email, employeeCode: "ADMIN", password: PASSWORD } });
+    const res = await call("/auth/login", { method: "POST", body: { workspace: w.slug, identifier: email, password: PASSWORD } });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    return res;
+  };
+  const regA = await setUp(A, "Admin A", "admin@a.test");
+  const regB = await setUp(B, "Admin B", "admin@b.test");
   A.token = regA.body.token;
   A.id = regA.body.tenant.id;
   B.token = regB.body.token;
@@ -232,6 +232,15 @@ try {
     await asApp({ tenantId: A.id, userId: A.empId, role: "employee" }, (tx) =>
       expectPgError("42501", () => tx`insert into holidays (date, name) values ('2026-03-04', 'self-declared')`),
     );
+  });
+
+  await check("the app role can't read or add platform admins directly", async () => {
+    await asApp({ tenantId: A.id, role: "admin" }, async (tx) => {
+      await expectPgError("42501", () => tx.savepoint((sp) => sp`select * from app.platform_admins`));
+      await expectPgError("42501", () =>
+        tx.savepoint((sp) => sp`insert into app.platform_admins (email, name, password_hash) values ('x@x.test', 'x', 'x')`),
+      );
+    });
   });
 
   await check("the audit log can't be rewritten", async () => {

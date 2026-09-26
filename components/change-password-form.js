@@ -12,8 +12,9 @@ const RULES = [
   { test: (v) => /\d/.test(v), label: "A number" },
 ];
 
-export function ChangePasswordForm({ cancelHref }) {
-  const [state, onSubmit, pending] = useFormAction(changePassword);
+/** `action` defaults to a workspace user's own password; the platform console passes its own. */
+export function ChangePasswordForm({ cancelHref, action = changePassword }) {
+  const [state, onSubmit, pending] = useFormAction(action);
   const [pw, setPw] = useState("");
   const f = state?.fields ?? {};
 

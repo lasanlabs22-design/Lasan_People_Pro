@@ -1,13 +1,15 @@
 import Link from "@/components/link";
-import { ArrowUpRight, CalendarDays, CalendarOff, Inbox, UserCheck, Users } from "lucide-react";
+import { ArrowUpRight, CalendarDays, CalendarOff, Inbox, PartyPopper, UserCheck, Users } from "lucide-react";
 import { load } from "@/lib/api";
 import { fmtDate, fmtRange, fmtDays, fmtTime, greeting } from "@/lib/format";
-import { Avatar, Badge, Card, CardHeader, EmptyState, LinkButton, PageHeader, StatCard } from "@/components/ui";
+import { Alert, Avatar, Badge, Card, CardHeader, EmptyState, LinkButton, PageHeader, StatCard } from "@/components/ui";
+import { ConsumeSearchParam } from "@/components/url-params";
 
 export const metadata = { title: "Overview" };
 
-export default async function AdminOverview() {
-  const [{ user }, overview, pending, roll] = await Promise.all([
+export default async function AdminOverview({ searchParams }) {
+  const { welcome } = await searchParams;
+  const [{ user, tenant }, overview, pending, roll] = await Promise.all([
     load("/auth/me"),
     load("/admin/overview"),
     load("/admin/leaves", { query: { status: "pending" } }),
@@ -32,6 +34,28 @@ export default async function AdminOverview() {
           </LinkButton>
         }
       />
+
+      {/* First sign-in of an admin whose workspace Lasan just set up. */}
+      {welcome && <ConsumeSearchParam name="welcome" />}
+      {welcome && (
+        <Alert tone="brand" className="mb-6 animate-fade-up">
+          <p className="flex items-center gap-2 font-medium">
+            <PartyPopper className="size-4" /> Welcome to {tenant.name} on Lasan People Pro
+          </p>
+          <p className="mt-1.5">
+            Your team signs in with the workspace name{" "}
+            <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono">{tenant.slug}</code>. To get started,{" "}
+            <Link href="/admin/settings" className="font-medium underline underline-offset-4">
+              open Settings
+            </Link>{" "}
+            to set your weekly off days, add your office location and check the leave policy, then{" "}
+            <Link href="/admin/employees?new=1" className="font-medium underline underline-offset-4">
+              add your employees
+            </Link>
+            .
+          </p>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4 animate-fade-up">
         <StatCard label="Active employees" value={stats.employees} icon={Users} accent="brand" />

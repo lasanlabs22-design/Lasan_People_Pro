@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server";
 
-const PUBLIC = new Set(["/login", "/signup"]);
+const PUBLIC = new Set(["/login"]);
 
 // Optimistic routing only. Every API call re-checks the token, tenant, role and revocation server-side.
 export function proxy(request) {
   const { pathname, search } = request.nextUrl;
+
+  // The platform console has its own session, independent of any workspace sign-in.
+  if (pathname === "/platform" || pathname.startsWith("/platform/")) {
+    if (pathname === "/platform/logout") return NextResponse.next();
+    const hasPlatform = Boolean(request.cookies.get("lasan_pro_platform")?.value);
+    if (pathname === "/platform/login") {
+      return hasPlatform ? NextResponse.redirect(new URL("/platform", request.url)) : NextResponse.next();
+    }
+    return hasPlatform ? NextResponse.next() : NextResponse.redirect(new URL("/platform/login", request.url));
+  }
+
   const hasSession = Boolean(request.cookies.get("lasan_pro_session")?.value);
   const role = request.cookies.get("lasan_pro_role")?.value;
   const home = role === "admin" ? "/admin" : "/employee";
@@ -27,5 +38,5 @@ export function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/signup", "/admin/:path*", "/employee/:path*", "/change-password"],
+  matcher: ["/", "/login", "/admin/:path*", "/employee/:path*", "/change-password", "/platform", "/platform/:path*"],
 };

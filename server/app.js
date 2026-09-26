@@ -10,6 +10,7 @@ import { leaveTypeRoutes, holidayRoutes, orgRoutes, configRoutes } from "./route
 import { attendanceRoutes, adminAttendanceRoutes } from "./routes/attendance.js";
 import { employeeRoutes } from "./routes/employees.js";
 import { overviewRoutes } from "./routes/overview.js";
+import { platformAuthRoutes, platformRoutes } from "./routes/platform.js";
 
 // Postgres unique-constraint names → the form field they belong to. All are per tenant.
 const UNIQUE_FIELDS = {
@@ -18,6 +19,7 @@ const UNIQUE_FIELDS = {
   users_email_uq: ["email", "That email is already in use"],
   leave_types_code_uq: ["code", "That code is already in use"],
   holidays_date_uq: ["date", "There is already a holiday on that date"],
+  platform_admins_email_uq: ["email", "A Lasan staff member with that email already exists"],
 };
 
 /**
@@ -33,6 +35,9 @@ export function createApp() {
   app.get("/health", (c) => c.json({ ok: true, time: new Date().toISOString() }));
 
   app.route("/auth", authRoutes);
+  // Platform console: its own sign-in and tokens, registered before the workspace API's auth.
+  app.route("/platform", platformAuthRoutes);
+  app.route("/platform", platformRoutes);
 
   const api = new Hono();
   api.use("*", requireAuth);

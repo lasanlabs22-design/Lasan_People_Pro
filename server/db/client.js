@@ -90,6 +90,41 @@ export const rateLimits = {
   reset: (key) => root().pool`select app.rate_limit_reset(${key})`,
 };
 
+/**
+ * Platform (super) admins and the cross-workspace view they manage (see db/migrations/0005).
+ * They sit outside every tenant, so these run on the pool through definer functions.
+ */
+export const platform = {
+  async adminByEmail(email) {
+    const [row] = await root().pool`select * from app.platform_admin_by_email(${email})`;
+    return row ?? null;
+  },
+  async adminById(id) {
+    const [row] = await root().pool`select * from app.platform_admin_by_id(${id})`;
+    return row ?? null;
+  },
+  signedIn: (id) => root().pool`select app.platform_admin_signed_in(${id})`,
+  team: () => root().pool`select * from app.platform_admins()`,
+  async createAdmin({ email, name, passwordHash, createdBy }) {
+    const [row] = await root().pool`select app.platform_admin_create(${email}, ${name}, ${passwordHash}, ${createdBy}) as id`;
+    return row.id;
+  },
+  /** Returns the new token version, or null if there's no such admin. */
+  async setPassword(id, passwordHash, mustChange) {
+    const [row] = await root().pool`select app.platform_admin_set_password(${id}, ${passwordHash}, ${mustChange}) as tv`;
+    return row.tv;
+  },
+  async setActive(id, active) {
+    const [row] = await root().pool`select app.platform_admin_set_active(${id}, ${active}) as ok`;
+    return row.ok;
+  },
+  workspaces: () => root().pool`select * from app.platform_workspaces()`,
+  async setWorkspaceStatus(id, status) {
+    const [row] = await root().pool`select app.platform_set_workspace_status(${id}, ${status}) as ok`;
+    return row.ok;
+  },
+};
+
 export async function closeDb() {
   await globalThis.__lasanDb?.pool.end({ timeout: 5 });
   globalThis.__lasanDb = undefined;

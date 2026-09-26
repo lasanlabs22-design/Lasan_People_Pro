@@ -75,12 +75,7 @@ export function LoginForm({ next, workspace }) {
         Sign in <ArrowRight className="size-4" />
       </SubmitButton>
       <p className="text-center text-xs text-subtle">Forgot your password? Ask your admin to reset it.</p>
-      <p className="text-center text-sm text-muted">
-        New to Lasan People Pro?{" "}
-        <a href="/signup" className="font-medium text-brand-300 hover:text-brand-200">
-          Create a workspace
-        </a>
-      </p>
+      <p className="text-center text-sm text-muted">New company? Contact Lasan to have your workspace set up.</p>
     </form>
   );
 }
