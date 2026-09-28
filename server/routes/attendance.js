@@ -9,6 +9,7 @@ import { isoDate, monthQuery, optionalText, uuidParam } from "../lib/validators.
 import { audit } from "../lib/audit.js";
 import { env } from "../env.js";
 import { getSetting } from "../lib/settings.js";
+import { loadPhoto, storePhoto } from "../lib/photos.js";
 import { fullDayLeaveOn } from "../lib/leave.js";
 import { requireRole } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
@@ -37,8 +38,13 @@ function requirePhoto(user, input) {
   }
 }
 
-const savePhoto = (record, kind, photo) =>
-  photo ? db.insert(attendancePhotos).values({ attendanceId: record.id, kind, userId: record.userId, photo }) : null;
+// The file goes to photo storage (server/lib/photos.js); the row keeps its reference. If storage is
+// unavailable the punch fails as a whole, so no check-in is recorded without its required photo.
+async function savePhoto(record, kind, photo) {
+  if (!photo) return;
+  const stored = await storePhoto(photo, "punches");
+  await db.insert(attendancePhotos).values({ attendanceId: record.id, kind, userId: record.userId, photo: stored });
+}
 
 /** Adds `photos: ["in", "out"]` (whichever were taken) to each attendance row, without loading the images. */
 export async function withPhotoKinds(records) {
@@ -183,8 +189,9 @@ attendanceRoutes.get(
       .select({ photo: attendancePhotos.photo, takenAt: attendancePhotos.createdAt })
       .from(attendancePhotos)
       .where(and(eq(attendancePhotos.attendanceId, id), eq(attendancePhotos.kind, kind)));
-    if (!row) throw notFound("Photo");
-    return c.json(row);
+    const photo = row && (await loadPhoto(row.photo));
+    if (!photo) throw notFound("Photo");
+    return c.json({ photo, takenAt: row.takenAt });
   },
 );
 

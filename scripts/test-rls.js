@@ -10,11 +10,15 @@ import { randomBytes } from "node:crypto";
 import postgres from "postgres";
 import { getApp } from "../server/app.js";
 import { closeDb } from "../server/db/client.js";
+import { deletePhotosByPrefix } from "../server/lib/photos.js";
 import { createTenant } from "../server/lib/tenants.js";
 import { sslFor } from "./lib/ssl.js";
 
 const app = getApp();
 const suffix = randomBytes(3).toString("hex");
+// Photos uploaded during the run go to their own Cloudinary folder, deleted at the end.
+const PHOTO_FOLDER = `lasan-people-pro-test/${suffix}`;
+process.env.CLOUDINARY_FOLDER = PHOTO_FOLDER;
 const A = { slug: `rls-a-${suffix}`, company: "RLS Test A" };
 const B = { slug: `rls-b-${suffix}`, company: "RLS Test B" };
 const PASSWORD = "Passw0rd!";
@@ -256,7 +260,8 @@ try {
   });
 
   await check("the directory shows only your own workspace", async () => {
-    const photo = "data:image/png;base64,iVBORw0KGgo=";
+    const photo =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP4z8CAFWEXHbQSACj/P8Fu7N9hAAAAAElFTkSuQmCC";
     assert.equal((await call("/me/profile", { method: "PUT", token: A.token, body: { avatar: photo } })).status, 200);
     const b = await call("/directory", { token: B.token });
     assert.equal(b.status, 200);
@@ -274,6 +279,7 @@ try {
   });
 } finally {
   await ownerSql`delete from tenants where slug in (${A.slug}, ${B.slug})`;
+  await deletePhotosByPrefix(`${PHOTO_FOLDER}/`);
   await Promise.all([appSql.end(), ownerSql.end(), closeDb()]);
   console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}. Test workspaces removed.`);
 }

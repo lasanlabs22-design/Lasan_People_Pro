@@ -1,7 +1,8 @@
 import { Hono } from "hono";
-import { sql } from "drizzle-orm";
-import { db } from "../db/client.js";
+import { eq, sql } from "drizzle-orm";
+import { db, schema } from "../db/client.js";
 import { notFound } from "../lib/errors.js";
+import { loadPhoto } from "../lib/photos.js";
 import { uuidParam } from "../lib/validators.js";
 import { validate } from "../middleware/validate.js";
 
@@ -10,6 +11,7 @@ import { validate } from "../middleware/validate.js";
  * limited to work details (name, ID, email, title, department, photo). Both queries go through
  * definer functions scoped to the request's workspace (db/migrations/0010).
  */
+const { profiles } = schema;
 export const directoryRoutes = new Hono();
 
 directoryRoutes.get("/", async (c) => {
@@ -28,8 +30,17 @@ directoryRoutes.get("/", async (c) => {
   });
 });
 
+// One person's profile photo, as a data URL for the /profile-photo route. Admins and the person
+// themselves read the profile directly (row-level security allows exactly them, revoked people
+// included); colleagues go through the directory function, which covers active people only.
 directoryRoutes.get("/:id/photo", validate("param", uuidParam), async (c) => {
-  const [row] = await db.execute(sql`select app.directory_photo(${c.req.valid("param").id}) as photo`);
-  if (!row?.photo) throw notFound("Photo");
-  return c.json({ photo: row.photo });
+  const { id } = c.req.valid("param");
+  const me = c.get("user");
+  const [row] =
+    me.role === "admin" || me.id === id
+      ? await db.select({ photo: profiles.avatar }).from(profiles).where(eq(profiles.userId, id))
+      : await db.execute(sql`select app.directory_photo(${id}) as photo`);
+  const photo = row?.photo && (await loadPhoto(row.photo));
+  if (!photo) throw notFound("Photo");
+  return c.json({ photo });
 });
