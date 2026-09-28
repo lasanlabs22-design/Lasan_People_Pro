@@ -7,7 +7,9 @@ import { Alert, Button } from "./ui";
 /** Shows a one-time login for the admin to hand over. */
 export function CredentialsCard({ name, workspace, loginId, password }) {
   const [copied, setCopied] = useState(false);
-  const signInUrl = typeof window === "undefined" ? "" : `${window.location.origin}/login?workspace=${workspace}`;
+  // Always the customer address, even when the console (on its own address) creates the login.
+  const origin = process.env.NEXT_PUBLIC_APP_URL || (typeof window === "undefined" ? "" : window.location.origin);
+  const signInUrl = `${origin}/login?workspace=${workspace}`;
   const text = `Hi ${name.split(" ")[0]}, here is your Lasan People Pro login.\nSign in at: ${signInUrl}\nWorkspace: ${workspace}\nID: ${loginId}\nTemporary password: ${password}\nYou'll be asked to set your own password when you first sign in.`;
   return (
     <div className="space-y-4">
