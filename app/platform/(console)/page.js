@@ -9,7 +9,9 @@ export const metadata = { title: "Workspaces · Platform" };
 
 export default async function WorkspacesPage({ searchParams }) {
   const { password } = await searchParams;
-  const { workspaces } = await loadPlatform("/platform/workspaces");
+  const [{ workspaces }, { admin: me }] = await Promise.all([loadPlatform("/platform/workspaces"), loadPlatform("/platform/me")]);
+  // Suspending and reactivating are for admins; staff see the status only.
+  const canChangeStatus = me.role === "admin";
   const active = workspaces.filter((w) => w.status === "active").length;
 
   return (
@@ -70,7 +72,7 @@ export default async function WorkspacesPage({ searchParams }) {
                     </Badge>
                   </Td>
                   <Td className="text-right">
-                    <WorkspaceStatusButton workspace={w} />
+                    {canChangeStatus && <WorkspaceStatusButton workspace={w} />}
                   </Td>
                 </tr>
               ))}

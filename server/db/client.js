@@ -128,6 +128,10 @@ export const platform = {
     const [row] = await root().pool`select app.platform_admin_set_active(${id}, ${active}) as ok`;
     return row.ok;
   },
+  /** Appends to the console's audit trail (db/migrations/0009); nothing can edit or remove it. */
+  audit: ({ actorId = null, actorEmail = null, action, targetType = null, targetId = null, targetLabel = null, ip = null, meta = null }) =>
+    root().pool`select app.platform_audit_record(${actorId}, ${actorEmail}, ${action}, ${targetType}, ${targetId}, ${targetLabel}, ${ip}, ${meta ? JSON.stringify(meta) : null}::jsonb)`,
+  auditLog: (limit) => root().pool`select * from app.platform_audit_list(${limit})`,
   workspaces: () => root().pool`select * from app.platform_workspaces()`,
   async setWorkspaceStatus(id, status) {
     const [row] = await root().pool`select app.platform_set_workspace_status(${id}, ${status}) as ok`;

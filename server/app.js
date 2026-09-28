@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { bodyLimit } from "hono/body-limit";
+import { HTTPException } from "hono/http-exception";
 import { ApiError } from "./lib/errors.js";
 import { requireAuth } from "./middleware/auth.js";
 import { authRoutes } from "./routes/auth.js";
@@ -59,6 +60,10 @@ export function createApp() {
   app.onError((err, c) => {
     if (err instanceof ApiError) {
       return c.json({ error: { message: err.message, code: err.code, fields: err.fields } }, err.status);
+    }
+    // Hono's own refusals, such as a request body that isn't valid JSON.
+    if (err instanceof HTTPException && err.status < 500) {
+      return c.json({ error: { message: err.message || "Bad request", code: "bad_request" } }, err.status);
     }
     const pg = err.cause ?? err;
     if (pg?.code === "23505") {

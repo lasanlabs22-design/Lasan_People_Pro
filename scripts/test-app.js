@@ -425,6 +425,44 @@ try {
     assert.equal((await call(`/platform/team/${me.body.admin.id}/role`, { method: "POST", token, body: { role: "admin" } })).status, 403);
   });
 
+  await check("staff can't suspend or reactivate a workspace, or read the audit trail", async () => {
+    const { body } = await call("/platform/workspaces", { token: colleague.token });
+    const id = body.workspaces.find((w) => w.slug === P.slug).id;
+    for (const path of ["suspend", "activate"]) {
+      assert.equal((await call(`/platform/workspaces/${id}/${path}`, { method: "POST", token: colleague.token })).status, 403, path);
+    }
+    const [row] = await ownerSql`select status from tenants where id = ${id}`;
+    assert.equal(row.status, "active");
+    assert.equal((await call("/platform/audit", { token: colleague.token })).status, 403);
+  });
+
+  await check("the console's audit trail records who did what", async () => {
+    const { body } = await call("/platform/audit", { token: P.token });
+    const mine = body.entries.filter((e) => e.actorEmail === P.email);
+    for (const action of ["auth.login", "auth.login_failed", "workspace.created", "workspace.suspended", "workspace.reactivated", "team.added", "team.password_reset"]) {
+      assert.ok(mine.some((e) => e.action === action), `missing ${action}`);
+    }
+    const suspended = mine.find((e) => e.action === "workspace.suspended");
+    assert.match(suspended.targetLabel, new RegExp(P.slug));
+    assert.equal(suspended.ip, IP);
+  });
+
+  await check("someone who knows a console email can't lock its owner out", async () => {
+    const from = (n) => `100.${64 + n}.${Number.parseInt(suffix.slice(4, 6), 16)}.9`;
+    const signIn = (password, ip) =>
+      call("/platform/login", { method: "POST", body: { email: colleague.email, password }, headers: { "x-forwarded-for": ip } });
+    ok(await signIn("Staff0Pass", from(0)));
+    // Failures from many addresses use up the account-wide budget…
+    for (let i = 1; i <= 30; i++) await signIn("wrong-password", from(i));
+    assert.equal((await signIn("Staff0Pass", from(40))).status, 429);
+    // …but the owner's usual address still gets in.
+    ok(await signIn("Staff0Pass", from(0)));
+    // And one address still can't keep guessing at one account.
+    let last;
+    for (let i = 0; i < 11; i++) last = await signIn("wrong-password", from(50));
+    assert.equal(last.status, 429);
+  });
+
   await check("an admin who forgot their password asks another admin, who can answer it", async () => {
     const forgetful = { email: `forgot-${suffix}@app.test` };
     const made = await call("/platform/team", {
@@ -513,12 +551,27 @@ try {
     assert.equal((await platformLogin(P.password)).status, 401);
   });
 
+  await check("a body that isn't valid JSON is a 400, not a server error", async () => {
+    const res = await app.request("/platform/login", {
+      method: "POST",
+      headers: { "x-forwarded-for": IP, "content-type": "application/json" },
+      body: "{not json",
+    });
+    assert.equal(res.status, 400);
+  });
+
   console.log("Maintenance");
   await check("the owner can delete someone who reviewed leave (cascade isn't blocked by guards)", async () => {
     // The workspace admin recorded (reviewed) leave above; removing them nulls reviewer_id on those rows.
     await ownerSql`delete from users where id = ${W.adminId}`;
     const [row] = await ownerSql`select count(*)::int as n from leave_requests where tenant_id = (select id from tenants where slug = ${W.slug}) and reviewer_id is null`;
     assert.ok(row.n > 0);
+  });
+
+  await check("a workspace with leave history can be deleted", async () => {
+    await ownerSql`delete from tenants where slug = ${W.slug}`;
+    const [row] = await ownerSql`select count(*)::int as n from tenants where slug = ${W.slug}`;
+    assert.equal(row.n, 0);
   });
 } finally {
   await ownerSql`delete from tenants where slug in (${W.slug}, ${P.slug})`;
