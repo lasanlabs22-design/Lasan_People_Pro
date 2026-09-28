@@ -20,6 +20,7 @@ import {
 import { Logo } from "./brand";
 import { NavPending } from "./nav-pending";
 import { PoweredBy } from "./powered-by";
+import { ThemeToggle } from "./theme-toggle";
 import { Avatar, cn } from "./ui";
 
 const NAV = {
@@ -65,16 +66,16 @@ export function Shell({ user, tenant, badges = {}, children }) {
             key={href}
             href={href}
             className={cn(
-              "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
-              active ? "bg-white/[0.07] text-fg" : "text-muted hover:bg-white/[0.04] hover:text-fg",
+              "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+              active ? "bg-brand-500/10 font-semibold text-brand-50" : "text-fg hover:bg-white/[0.05]",
             )}
           >
-            {active && <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-gradient-to-b from-brand-400 to-cyan-glow" />}
-            <Icon className={cn("size-[18px]", active ? "text-brand-300" : "text-subtle group-hover:text-muted")} />
+            {active && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-sm bg-brand-500" />}
+            <Icon className={cn("size-[18px]", active ? "text-brand-300" : "text-muted")} />
             <span className="flex-1">{label}</span>
             <NavPending spinner />
             {badge > 0 && (
-              <span className="grid min-w-5 place-items-center rounded-full bg-brand-500 px-1.5 text-[10px] font-semibold text-white">
+              <span className="grid min-w-5 place-items-center rounded-full bg-brand-500 px-1.5 text-[10px] font-semibold text-on-brand">
                 {badge}
               </span>
             )}
@@ -85,7 +86,7 @@ export function Shell({ user, tenant, badges = {}, children }) {
   );
 
   const workspace = tenant && (
-    <div className="mb-6 flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2" title={`Workspace: ${tenant.slug}`}>
+    <div className="mb-5 flex items-center gap-2.5 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2" title={`Workspace: ${tenant.slug}`}>
       <Building2 className="size-4 shrink-0 text-brand-300" />
       <div className="min-w-0">
         <p className="truncate text-sm font-medium">{tenant.name}</p>
@@ -95,7 +96,7 @@ export function Shell({ user, tenant, badges = {}, children }) {
   );
 
   const account = (
-    <div className="mt-6 flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-2.5">
+    <div className="mt-6 flex items-center gap-3 rounded-md border border-white/10 bg-white/[0.02] p-2.5">
       <Avatar src={user.avatar} name={user.name} size={36} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{user.name}</p>
@@ -112,25 +113,29 @@ export function Shell({ user, tenant, badges = {}, children }) {
 
   return (
     <div className="flex min-h-dvh flex-col lg:pl-64">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-white/[0.06] bg-ink-950/60 p-4 backdrop-blur-xl lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-white/10 bg-ink-900 p-4 lg:flex">
         <Link href={items[0].href} className="mb-4 px-2 pt-2">
           <Logo />
         </Link>
         {workspace}
         {nav}
+        <ThemeToggle withLabel className="mt-4 w-full justify-center" />
         {account}
       </aside>
 
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/[0.06] bg-ink-950/70 px-4 py-3 backdrop-blur-xl lg:hidden">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-ink-900 px-4 py-3 lg:hidden">
         <Logo />
-        <button onClick={() => setOpen(true)} className="rounded-lg p-2 text-muted hover:bg-white/10" aria-label="Open menu">
-          <Menu className="size-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <button onClick={() => setOpen(true)} className="rounded-md p-2 text-muted hover:bg-white/10" aria-label="Open menu">
+            <Menu className="size-5" />
+          </button>
+        </div>
       </header>
 
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-white/10 bg-ink-900 p-4 animate-fade-up">
             <div className="mb-4 flex items-center justify-between px-2 pt-2">
               <Logo />
@@ -157,7 +162,7 @@ export function Shell({ user, tenant, badges = {}, children }) {
 function BottomNav({ items, pathname }) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-ink-950/85 backdrop-blur-xl lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ink-900 lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul className="mx-auto grid max-w-lg grid-cols-5">
@@ -172,7 +177,7 @@ function BottomNav({ items, pathname }) {
                   active ? "text-brand-300" : "text-subtle hover:text-muted",
                 )}
               >
-                <span className={cn("grid h-7 w-12 place-items-center rounded-full transition-colors", active && "bg-brand-500/15")}>
+                <span className={cn("grid h-7 w-12 place-items-center rounded-md transition-colors", active && "bg-brand-500/10")}>
                   <Icon className="size-[18px]" />
                 </span>
                 {label === "My leaves" ? "Leaves" : label}

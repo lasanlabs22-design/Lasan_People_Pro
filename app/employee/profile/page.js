@@ -17,7 +17,6 @@ export default async function ProfilePage() {
       <div className="grid gap-6 xl:grid-cols-[340px_1fr]">
         <div className="space-y-6">
           <Card className="relative overflow-hidden p-6 text-center">
-            <div className="pointer-events-none absolute inset-x-0 -top-20 mx-auto size-60 rounded-full bg-brand-500/25 blur-3xl" />
             <div className="relative">
               <AvatarUploader name={user.name} avatar={profile.avatar ?? null} />
               <h2 className="mt-4 font-display text-xl font-semibold">{user.name}</h2>
@@ -28,7 +27,7 @@ export default async function ProfilePage() {
                   <span className="tabular-nums">{completeness}%</span>
                 </div>
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div className="h-full rounded-full bg-gradient-to-r from-brand-400 to-cyan-glow" style={{ width: `${completeness}%` }} />
+                  <div className="h-full rounded-full bg-brand-500" style={{ width: `${completeness}%` }} />
                 </div>
               </div>
             </div>

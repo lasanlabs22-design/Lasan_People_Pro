@@ -142,7 +142,7 @@ export function CameraCapture({ onConfirm, onReady, confirmLabel = "Use photo", 
           <button
             type="button"
             onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
-            className="absolute right-3 top-3 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+            className="absolute right-3 top-3 rounded-full bg-black/50 p-2 text-on-brand hover:bg-black/70"
             aria-label="Switch camera"
           >
             <SwitchCamera className="size-4" />

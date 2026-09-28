@@ -34,7 +34,7 @@ export default async function LeavesPage({ searchParams }) {
           >
             {t}
             {t === "pending" && pendingCount > 0 && (
-              <span className="grid min-w-5 place-items-center rounded-full bg-brand-500 px-1.5 text-[10px] font-semibold text-white">{pendingCount}</span>
+              <span className="grid min-w-5 place-items-center rounded-full bg-brand-500 px-1.5 text-[10px] font-semibold text-on-brand">{pendingCount}</span>
             )}
           </Link>
         ))}

@@ -64,7 +64,7 @@ export function AvatarUploader({ name, avatar }) {
   return (
     <div className="flex flex-col items-center">
       <div className="group relative">
-        <div className="rounded-full bg-gradient-to-br from-brand-400 via-cyan-glow to-pink-400 p-[3px]">
+        <div className="rounded-full bg-white/15 p-px">
           <div className="rounded-full bg-ink-900 p-1">
             <Avatar src={shown} name={name} size={120} />
           </div>
@@ -73,7 +73,7 @@ export function AvatarUploader({ name, avatar }) {
           type="button"
           onClick={() => input.current?.click()}
           disabled={pending}
-          className="absolute inset-0 grid place-items-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+          className="absolute inset-0 grid place-items-center rounded-full bg-black/55 text-on-brand opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
           aria-label="Change photo"
         >
           {pending ? <Loader2 className="size-6 animate-spin" /> : <Camera className="size-6" />}
@@ -141,7 +141,7 @@ export function ProfileForm({ profile }) {
               key={g}
               className={cn(
                 "grid h-11 w-14 cursor-pointer place-items-center rounded-xl border border-white/[0.08] bg-white/[0.02] font-display font-semibold text-muted transition-all",
-                "hover:border-white/20 has-[:checked]:border-rose-400/60 has-[:checked]:bg-rose-500/15 has-[:checked]:text-rose-200 has-[:checked]:shadow-[0_0_20px_-4px_rgb(244_63_94/0.5)]",
+                "hover:border-white/20 has-[:checked]:border-rose-400/60 has-[:checked]:bg-rose-500/15 has-[:checked]:text-rose-200",
               )}
             >
               <input type="radio" name="bloodGroup" value={g} defaultChecked={profile.bloodGroup === g} className="sr-only" />

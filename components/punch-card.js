@@ -81,11 +81,10 @@ export function PunchCard({ today }) {
 
   return (
     <Card className="relative overflow-hidden p-5 sm:p-6">
-      <Radar active={state !== "done"} />
       <div className="relative flex h-full flex-col">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand-300/80">Attendance</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Attendance</p>
             <p className="mt-1 text-sm text-muted">{fmtDate(date, { weekday: "long", day: "numeric", month: "long" })}</p>
           </div>
           <GeoStatus mode={geofenceMode} offices={offices} near={near} inside={inside} />
@@ -118,7 +117,7 @@ export function PunchCard({ today }) {
               </p>
               <p className="mt-1 text-xs text-cyan-100/70">
                 Working after all?{" "}
-                <Link href="/employee/leaves" className="underline underline-offset-4 hover:text-white">
+                <Link href="/employee/leaves" className="underline underline-offset-4 hover:text-fg">
                   Cancel the leave
                 </Link>{" "}
                 first, then check in.
@@ -130,13 +129,10 @@ export function PunchCard({ today }) {
               onClick={go}
               disabled={pending}
               className={cn(
-                "group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl py-4 text-base font-semibold text-white transition-all active:scale-[0.99] disabled:opacity-70",
-                state === "in"
-                  ? "bg-gradient-to-r from-brand-500 via-brand-600 to-cyan-600 shadow-glow hover:brightness-110"
-                  : "bg-gradient-to-r from-rose-500 to-orange-500 shadow-[0_10px_40px_-10px_rgb(244_63_94/0.6)] hover:brightness-110",
+                "flex w-full items-center justify-center gap-3 rounded-md py-3.5 text-base font-semibold text-on-brand transition-colors disabled:opacity-70",
+                state === "in" ? "bg-brand-500 hover:bg-brand-600" : "bg-rose-600 hover:bg-rose-700",
               )}
             >
-              <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
               {pending ? (
                 <>
                   <Loader2 className="size-5 animate-spin" /> {geofenceMode === "off" ? "Saving…" : "Locating you…"}
@@ -194,7 +190,7 @@ export function PunchCard({ today }) {
 
 function Stat({ label, value, highlight }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-2 py-3">
+    <div className="rounded-md border border-white/10 bg-white/[0.02] px-2 py-3">
       <p className="text-[10px] uppercase tracking-wider text-subtle">{label}</p>
       <p className={cn("mt-1 font-display text-base font-semibold tabular-nums", highlight && "text-brand-300")} suppressHydrationWarning>
         {value}
@@ -225,22 +221,5 @@ function GeoStatus({ mode, offices, near, inside }) {
     >
       <MapPin className="size-3" /> {inside ? `At ${near.office.name}` : `${fmtDistance(near.distance)} from ${near.office.name}`}
     </span>
-  );
-}
-
-function Radar({ active }) {
-  return (
-    <div className="pointer-events-none absolute -right-[168px] -top-6 size-72" aria-hidden>
-      <div className="absolute inset-0 rounded-full border border-brand-400/15" />
-      <div className="absolute inset-10 rounded-full border border-brand-400/15" />
-      <div className="absolute inset-20 rounded-full border border-brand-400/20" />
-      {active && (
-        <>
-          <div className="absolute inset-24 rounded-full bg-brand-500/30 animate-pulse-ring" />
-          <div className="absolute inset-24 rounded-full bg-brand-500/20 animate-pulse-ring [animation-delay:1.1s]" />
-        </>
-      )}
-      <div className="absolute inset-[132px] rounded-full bg-brand-400 shadow-[0_0_20px_rgb(154_130_255)]" />
-    </div>
   );
 }

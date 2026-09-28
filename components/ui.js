@@ -5,16 +5,15 @@ import { initials } from "@/lib/format";
 export const cn = (...c) => c.filter(Boolean).join(" ");
 
 const BTN_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-all duration-150 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/30 active:scale-[0.98] whitespace-nowrap";
+  "inline-flex items-center justify-center gap-2 rounded-md border text-sm font-semibold transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 focus-visible:ring-offset-ink-900 whitespace-nowrap";
 const BTN_VARIANTS = {
-  primary:
-    "bg-gradient-to-b from-brand-400 to-brand-600 text-white shadow-glow hover:brightness-110",
-  secondary: "border border-white/10 bg-white/[0.04] text-fg hover:bg-white/[0.08] hover:border-white/20",
-  ghost: "text-muted hover:text-fg hover:bg-white/[0.06]",
-  danger: "border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20",
-  success: "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20",
+  primary: "border-brand-500 bg-brand-500 text-on-brand hover:border-brand-600 hover:bg-brand-600",
+  secondary: "border-white/25 bg-ink-900 text-fg hover:bg-white/[0.05]",
+  ghost: "border-transparent text-muted hover:text-fg hover:bg-white/[0.06]",
+  danger: "border-rose-500/40 bg-ink-900 text-rose-300 hover:bg-rose-500/10",
+  success: "border-emerald-500/40 bg-ink-900 text-emerald-300 hover:bg-emerald-500/10",
 };
-const BTN_SIZES = { sm: "h-8 px-3 text-xs", md: "h-10 px-4", lg: "h-12 px-6 text-base" };
+const BTN_SIZES = { sm: "h-8 px-3 text-xs", md: "h-9 px-4", lg: "h-11 px-6 text-base" };
 
 export function buttonClass({ variant = "primary", size = "md", className } = {}) {
   return cn(BTN_BASE, BTN_VARIANTS[variant], BTN_SIZES[size], className);
@@ -41,12 +40,12 @@ export function CardHeader({ title, subtitle, icon: Icon, action, className }) {
     <div className={cn("flex items-start justify-between gap-4 px-5 pt-5", className)}>
       <div className="flex items-center gap-3 min-w-0">
         {Icon && (
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-brand-300">
+          <span className="grid size-8 shrink-0 place-items-center rounded-md bg-brand-500/10 text-brand-300">
             <Icon className="size-4" />
           </span>
         )}
         <div className="min-w-0">
-          <h3 className="font-display text-[15px] font-semibold tracking-tight">{title}</h3>
+          <h3 className="text-[15px] font-semibold">{title}</h3>
           {subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
         </div>
       </div>
@@ -69,7 +68,7 @@ export function Badge({ tone = "slate", dot, className, children }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium capitalize",
+        "inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5 text-[11px] font-semibold capitalize",
         TONES[tone],
         className,
       )}
@@ -91,7 +90,7 @@ export function Avatar({ src, name, size = 40, className }) {
       style={style}
       aria-label={name}
       className={cn(
-        "grid shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-500/40 to-cyan-500/30 font-display font-semibold text-white ring-1 ring-white/15",
+        "grid shrink-0 place-items-center rounded-full bg-brand-500 font-semibold text-on-brand",
         className,
       )}
     >
@@ -109,7 +108,7 @@ export function Stars({ value = 0, size = 16, className }) {
           <span key={i} className="relative inline-block" style={{ width: size, height: size }}>
             <StarSvg size={size} className="absolute inset-0 text-white/15" />
             <span className="absolute inset-0 overflow-hidden" style={{ width: `${fill * 100}%` }}>
-              <StarSvg size={size} className="text-amber-300 drop-shadow-[0_0_6px_rgb(252_211_77/0.5)]" />
+              <StarSvg size={size} className="text-amber-500" />
             </span>
           </span>
         );
@@ -128,10 +127,10 @@ function StarSvg({ size, className }) {
 
 export function PageHeader({ eyebrow, title, description, actions }) {
   return (
-    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between animate-fade-up">
+    <div className="mb-6 flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        {eyebrow && <p className="mb-1.5 text-xs font-medium uppercase tracking-[0.18em] text-brand-300/80">{eyebrow}</p>}
-        <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+        {eyebrow && <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-subtle">{eyebrow}</p>}
+        <h1 className="text-2xl font-semibold">{title}</h1>
         {description && <p className="mt-1.5 max-w-2xl text-sm text-muted">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -141,23 +140,23 @@ export function PageHeader({ eyebrow, title, description, actions }) {
 
 export function StatCard({ label, value, hint, icon: Icon, accent = "brand" }) {
   const accents = {
-    brand: "from-brand-500/25 text-brand-300",
-    emerald: "from-emerald-500/25 text-emerald-300",
-    amber: "from-amber-500/25 text-amber-300",
-    cyan: "from-cyan-500/25 text-cyan-300",
-    rose: "from-rose-500/25 text-rose-300",
+    brand: "border-t-brand-500 text-brand-300",
+    emerald: "border-t-emerald-500 text-emerald-300",
+    amber: "border-t-amber-500 text-amber-300",
+    cyan: "border-t-cyan-400 text-cyan-300",
+    rose: "border-t-rose-500 text-rose-300",
   };
+  const [bar, tone] = accents[accent].split(" ");
   return (
-    <Card className="relative overflow-hidden p-4 sm:p-5">
-      <div className={cn("pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-gradient-to-br to-transparent blur-2xl", accents[accent])} />
+    <Card className={cn("relative overflow-hidden border-t-[3px] p-4 sm:p-5", bar)}>
       <div className="relative flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs font-medium text-muted">{label}</p>
-          <p className="mt-2 font-display text-2xl font-semibold tracking-tight sm:text-3xl">{value}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+          <p className="mt-2 text-2xl font-semibold sm:text-3xl">{value}</p>
           {hint && <p className="mt-1 text-xs text-subtle">{hint}</p>}
         </div>
         {Icon && (
-          <span className={cn("hidden size-10 shrink-0 place-items-center rounded-xl sm:grid border border-white/10 bg-white/[0.04]", accents[accent].split(" ")[1])}>
+          <span className={cn("hidden size-9 shrink-0 place-items-center rounded-md sm:grid bg-white/[0.04]", tone)}>
             <Icon className="size-5" />
           </span>
         )}
@@ -170,7 +169,7 @@ export function EmptyState({ icon: Icon, title, description, action, className }
   return (
     <div className={cn("flex flex-col items-center justify-center px-6 py-12 text-center", className)}>
       {Icon && (
-        <span className="mb-4 grid size-12 place-items-center rounded-2xl border border-white/10 bg-white/[0.03] text-muted">
+        <span className="mb-4 grid size-12 place-items-center rounded-md border border-white/10 bg-white/[0.03] text-muted">
           <Icon className="size-5" />
         </span>
       )}
@@ -183,7 +182,7 @@ export function EmptyState({ icon: Icon, title, description, action, className }
 
 export function Label({ htmlFor, children, hint }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between text-xs font-medium text-muted">
+    <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between text-[13px] font-semibold text-fg">
       <span>{children}</span>
       {hint && <span className="font-normal text-subtle">{hint}</span>}
     </label>
@@ -230,7 +229,7 @@ export function Alert({ tone = "rose", children, className }) {
     brand: "border-brand-500/30 bg-brand-500/10 text-brand-50",
   };
   return (
-    <div role={tone === "rose" ? "alert" : "status"} className={cn("rounded-xl border px-4 py-3 text-sm", tones[tone], className)}>
+    <div role={tone === "rose" ? "alert" : "status"} className={cn("rounded-md border border-l-4 px-4 py-3 text-sm", tones[tone], className)}>
       {children}
     </div>
   );
@@ -245,7 +244,7 @@ export function Table({ children, className }) {
 }
 
 export function Th({ children, className }) {
-  return <th className={cn("whitespace-nowrap px-5 py-3 text-[11px] font-medium uppercase tracking-wider text-subtle", className)}>{children}</th>;
+  return <th className={cn("whitespace-nowrap bg-white/[0.03] px-5 py-2.5 text-xs font-semibold text-muted", className)}>{children}</th>;
 }
 
 export function Td({ children, className }) {

@@ -12,7 +12,7 @@ export function LoginForm({ next, workspace }) {
 
   return (
     // Starts empty: browsers are asked not to fill in a remembered workspace, ID or password.
-    <form onSubmit={onSubmit} className="mt-8 space-y-5" autoComplete="off">
+    <form onSubmit={onSubmit} className="mt-5 space-y-4" autoComplete="off">
       <input type="hidden" name="next" value={next} />
       <Alert>{state?.error}</Alert>
 
@@ -75,8 +75,7 @@ export function LoginForm({ next, workspace }) {
       <SubmitButton pending={pending} size="lg" className="w-full" pendingText="Signing in…">
         Sign in <ArrowRight className="size-4" />
       </SubmitButton>
-      <p className="text-center text-xs text-subtle">Forgot your password? Ask your admin to reset it.</p>
-      <p className="text-center text-sm text-muted">New company? Contact Lasan to have your workspace set up.</p>
+      <p className="text-center text-xs text-subtle">Forgot your password or need access? Contact your administrator.</p>
     </form>
   );
 }

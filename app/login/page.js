@@ -1,61 +1,40 @@
-import { CalendarCheck2, MapPinned, ShieldCheck, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Lock, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/brand";
 import { Alert } from "@/components/ui";
+import { api } from "@/lib/api";
 import { PoweredBy } from "@/components/powered-by";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { LoginForm } from "./login-form";
+import { SignInShowcase } from "./showcase";
 
 export const metadata = { title: "Sign in" };
-
-const FEATURES = [
-  { icon: MapPinned, title: "Geo-fenced check-in", text: "Punch in only when you're actually at the office." },
-  { icon: CalendarCheck2, title: "Leave in two taps", text: "Live balances, instant requests, clear decisions." },
-  { icon: ShieldCheck, title: "Private by default", text: "Your profile and history stay between you and HR." },
-];
 
 export default async function LoginPage({ searchParams }) {
   const { next, reason, workspace } = await searchParams;
   // Only a login link from an admin (…/login?workspace=acme) fills in the workspace; otherwise it starts empty.
   const prefill = typeof workspace === "string" ? workspace.toLowerCase() : "";
+  // Arriving from a company's link, greet it by name. The lookup is public and says nothing more.
+  const company = prefill ? (await api(`/auth/workspace/${encodeURIComponent(prefill)}`, { token: null }).catch(() => null))?.workspace : null;
   return (
-    <main className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
-      <section className="relative hidden overflow-hidden border-r border-white/5 p-12 lg:flex lg:flex-col">
-        <div className="absolute -left-32 top-1/3 size-[520px] rounded-full bg-brand-600/25 blur-[120px] animate-float" />
-        <div className="absolute -bottom-40 right-0 size-[420px] rounded-full bg-cyan-500/15 blur-[120px] animate-float [animation-delay:-6s]" />
-        <Logo />
-        <div className="relative my-auto max-w-lg">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-muted">
-            <Sparkles className="size-3.5 text-brand-300" /> Attendance & leave, reimagined
-          </span>
-          <h1 className="mt-6 font-display text-5xl font-semibold leading-[1.05] tracking-tight">
-            <span className="text-gradient">Show up.</span>
-            <br />
-            Take time off.
-            <br />
-            <span className="text-muted">Zero paperwork.</span>
-          </h1>
-          <ul className="mt-12 space-y-5">
-            {FEATURES.map(({ icon: Icon, title, text }) => (
-              <li key={title} className="flex gap-4">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-brand-300">
-                  <Icon className="size-5" />
-                </span>
-                <div>
-                  <p className="font-medium">{title}</p>
-                  <p className="text-sm text-muted">{text}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <p className="relative text-xs text-subtle">© {new Date().getFullYear()} Lasan. All rights reserved.</p>
-      </section>
+    <main className="relative grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
+      <div className="absolute inset-x-0 top-0 z-10 h-1 bg-brand-500" aria-hidden />
+      <SignInShowcase />
 
-      <section className="flex flex-col px-5">
-        <div className="m-auto w-full max-w-sm animate-fade-up py-12">
-          <Logo className="mb-10 lg:hidden" />
-          <h2 className="font-display text-3xl font-semibold tracking-tight">Welcome back</h2>
-          <p className="mt-2 text-sm text-muted">
-            Sign in with your company&apos;s workspace name and the employee ID or email you were given.
+      {/* Same background as the left panel, so the page reads as one surface. */}
+      <section className="relative flex flex-col overflow-hidden bg-ink-900 px-5 pt-16 pb-1 lg:pt-6">
+        {/* On wide screens the toggle sits in the left panel's top bar instead. */}
+        <ThemeToggle withLabel className="absolute right-5 top-5 z-10 lg:hidden" />
+        <div className="glass relative m-auto w-full max-w-[560px] rounded-md border-t-[3px] border-t-brand-500 px-6 py-7 sm:px-10">
+          <Logo className="mb-6 lg:hidden" />
+          <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-300">
+            <ShieldCheck className="size-3.5" /> Secure sign-in
+          </p>
+          <h2 className="mt-1.5 text-2xl font-semibold">{company ? `Sign in to ${company.name}` : "Sign in"}</h2>
+          <p className="mt-1 text-sm text-muted">
+            {company
+              ? "Use the employee ID or email and password your administrator gave you."
+              : "Enter your workspace, your employee ID or email, and your password."}
           </p>
           {reason === "revoked" && (
             <Alert className="mt-6">Your access has been revoked. Contact your administrator if this is a mistake.</Alert>
@@ -64,8 +43,24 @@ export default async function LoginPage({ searchParams }) {
             <Alert className="mt-6">Your company&apos;s workspace is suspended. Contact Lasan to have it reactivated.</Alert>
           )}
           <LoginForm next={typeof next === "string" ? next : ""} workspace={prefill} />
+          <div className="mt-6 space-y-1.5 border-t border-white/10 pt-4 text-center text-xs text-subtle">
+            <p className="flex items-center justify-center gap-1.5">
+              <Lock className="size-3.5 text-emerald-300" /> Your connection to this page is encrypted.
+            </p>
+            <p className="sm:whitespace-nowrap">
+              By signing in, you agree to the{" "}
+              <Link href="/terms" className="text-brand-300 hover:underline">
+                Terms and Conditions
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="text-brand-300 hover:underline">
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          </div>
         </div>
-        <PoweredBy />
+        <PoweredBy className="relative py-4!" />
       </section>
     </main>
   );
