@@ -1,20 +1,24 @@
-import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
+import { Space_Grotesk } from "next/font/google";
+import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-const spaceGrotesk = Space_Grotesk({ variable: "--font-space-grotesk", subsets: ["latin"] });
+// Only for the "Powered by Lasan Labs" signature; the app itself uses the system's Segoe UI.
+const spaceGrotesk = Space_Grotesk({ variable: "--font-space-grotesk", subsets: ["latin"], weight: ["600"] });
 
 export const metadata = {
   title: { default: "Lasan People Pro", template: "%s · Lasan People Pro" },
-  description: "Attendance, leave and people management for every company, by Lasan.",
+  description: "Attendance, leave and people management with photo-verified check-in.",
 };
 
-export const viewport = { themeColor: "#05060c" };
+export const viewport = { themeColor: "#0f6cbd" };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} h-full`}>
+    // The theme script sets data-theme before React hydrates, hence suppressHydrationWarning.
+    <html lang="en" className={`${spaceGrotesk.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-full">
         <div className="aurora" aria-hidden />
         {children}

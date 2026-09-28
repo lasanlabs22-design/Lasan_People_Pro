@@ -66,7 +66,7 @@ export function MonthCalendar({ month, holidays = {}, events = {}, weekendDays =
                   "grid shrink-0 place-items-center rounded-full tabular-nums",
                   compact ? "size-5 text-[10px] sm:size-6 sm:text-xs" : "size-6 text-xs",
                   isToday
-                    ? "bg-brand-500 font-semibold text-white shadow-glow"
+                    ? "bg-brand-500 font-semibold text-on-brand"
                     : sunday
                       ? "font-medium text-rose-400"
                       : weekend

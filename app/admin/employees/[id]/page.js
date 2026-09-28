@@ -47,7 +47,6 @@ export default async function EmployeeDetail({ params, searchParams }) {
       {/* overflow-clip, not -hidden: a hidden box can still be scrolled sideways (e.g. to keep a focused
           button in view while the actions re-render), which shoved the avatar off the left edge. */}
       <Card className="relative overflow-clip p-6 animate-fade-up">
-        <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-brand-500/20 blur-3xl" />
         <div className="relative flex flex-col gap-6 md:flex-row md:items-center">
           <Avatar src={profile.avatar} name={e.name} size={84} className="ring-2 ring-white/10" />
           <div className="min-w-0 flex-1">

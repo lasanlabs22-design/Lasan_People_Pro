@@ -1,4 +1,5 @@
 import { Logo } from "@/components/brand";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui";
 import { loadPlatform } from "@/lib/api";
 import { ConsoleNav, AccountMenu } from "./nav";
@@ -12,7 +13,10 @@ export default async function ConsoleLayout({ children }) {
           <Logo />
           <Badge tone="amber">Platform</Badge>
         </div>
-        <AccountMenu name={admin.name} email={admin.email} role={admin.role} />
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <AccountMenu name={admin.name} email={admin.email} role={admin.role} />
+        </div>
       </header>
       {!admin.mustChangePassword && <ConsoleNav isAdmin={admin.role === "admin"} passwordRequests={admin.passwordRequests} />}
       {children}
