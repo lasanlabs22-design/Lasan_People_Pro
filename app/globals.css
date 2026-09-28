@@ -322,3 +322,13 @@ dialog::backdrop {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Phones: iOS Safari zooms the whole page into any field whose text is under 16px, so fields
+   stay at 16px there. Unlayered so it wins over text-sm on inputs outside .field. */
+@media (max-width: 639.98px) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

@@ -85,7 +85,7 @@ export function DirectoryList({ people, meId }) {
                   </p>
                   <a
                     href={`mailto:${p.email}`}
-                    className="mt-2 inline-flex max-w-full items-center gap-1.5 text-sm text-brand-300 hover:underline"
+                    className="mt-1 inline-flex max-w-full items-center gap-1.5 py-1 text-sm text-brand-300 hover:underline"
                   >
                     <Mail className="size-3.5 shrink-0" />
                     <span className="truncate">{p.email}</span>

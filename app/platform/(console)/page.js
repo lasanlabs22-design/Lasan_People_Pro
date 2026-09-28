@@ -41,7 +41,27 @@ export default async function WorkspacesPage({ searchParams }) {
         {workspaces.length === 0 ? (
           <EmptyState icon={Building2} title="No workspaces yet" description="Create the first one with the button above." />
         ) : (
-          <Table className="mt-3">
+          <>
+          {/* Phones: one card per company so status and actions aren't pushed off-screen. */}
+          <ul className="mt-3 divide-y divide-white/[0.05] sm:hidden">
+            {workspaces.map((w) => (
+              <li key={w.id} className="flex items-center gap-3 px-5 py-3.5">
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-sm font-medium break-words">{w.name}</span>
+                    <Badge tone={w.status === "active" ? "emerald" : "rose"} dot>
+                      {w.status}
+                    </Badge>
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-muted">
+                    <span className="font-mono">{w.slug}</span> · {w.people} {w.people === 1 ? "person" : "people"}
+                  </span>
+                </span>
+                {canChangeStatus && <WorkspaceStatusButton workspace={w} />}
+              </li>
+            ))}
+          </ul>
+          <Table className="mt-3 hidden sm:block">
             <thead className="border-b border-white/[0.06]">
               <tr>
                 <Th>Company</Th>
@@ -78,6 +98,7 @@ export default async function WorkspacesPage({ searchParams }) {
               ))}
             </tbody>
           </Table>
+          </>
         )}
         <div className="h-2" />
       </Card>

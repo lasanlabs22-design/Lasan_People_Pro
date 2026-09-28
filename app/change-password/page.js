@@ -29,7 +29,7 @@ export default async function ChangePasswordPage() {
           <ChangePasswordForm cancelHref={first ? null : user.role === "admin" ? "/admin" : "/employee/profile"} />
         </Card>
         {first && (
-          <a href="/logout" className="mt-6 block text-center text-xs text-subtle hover:text-muted">
+          <a href="/logout" className="mx-auto mt-4 block w-fit px-2 py-2 text-center text-xs text-subtle hover:text-muted">
             Not you? Sign out
           </a>
         )}

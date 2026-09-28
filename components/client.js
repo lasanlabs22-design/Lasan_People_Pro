@@ -62,7 +62,7 @@ export function Modal({ open, onClose, title, description, children, className }
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose?.()}
       className={cn(
-        "m-auto w-[calc(100%-2rem)] max-w-lg rounded-2xl border border-white/10 bg-ink-900/95 p-0 text-fg shadow-2xl backdrop:bg-transparent open:animate-fade-up",
+        "m-auto w-[calc(100%-2rem)] max-w-lg rounded-2xl border border-white/10 bg-ink-900 p-0 text-fg shadow-2xl backdrop:bg-transparent open:animate-fade-up",
         className,
       )}
     >

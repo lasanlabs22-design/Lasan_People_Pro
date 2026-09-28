@@ -214,7 +214,7 @@ export function AllocationEditor({ employeeId, year, balance }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 text-xs text-subtle transition-colors hover:text-brand-300"
+        className="-my-1.5 inline-flex items-center gap-1.5 py-1.5 text-xs text-subtle transition-colors hover:text-brand-300"
       >
         <SlidersHorizontal className="size-3" />
         {balance.overridden ? "Custom quota · adjust" : "Adjust quota"}

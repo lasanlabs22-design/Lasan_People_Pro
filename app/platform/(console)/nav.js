@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, ChevronDown, History, KeyRound, LogOut, UsersRound } from "lucide-react";
+import { Building2, ChevronDown, History, KeyRound, LogOut, UserRound, UsersRound } from "lucide-react";
 import { cn } from "@/components/ui";
 
 const TABS = [
@@ -18,17 +18,17 @@ export function ConsoleNav({ isAdmin, passwordRequests = 0 }) {
   const tabs = TABS.filter((t) => isAdmin || !t.adminOnly);
   if (tabs.length < 2) return null;
   return (
-    <nav className="mb-8 flex gap-1 border-b border-white/15 sm:w-full">
+    <nav className="mb-6 flex gap-1 border-b border-white/15 sm:mb-8 sm:w-full">
       {tabs.map(({ href, label, icon: Icon, badge }) => (
         <Link
           key={href}
           href={href}
           className={cn(
-            "-mb-px inline-flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-2.5 text-sm transition-colors sm:flex-none",
+            "-mb-px inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap border-b-2 px-2 py-2.5 text-sm transition-colors sm:flex-none sm:px-4",
             pathname === href ? "border-brand-500 font-semibold text-brand-50" : "border-transparent text-muted hover:text-fg",
           )}
         >
-          <Icon className="size-4" /> {label}
+          <Icon className="hidden size-4 sm:block" /> {label}
           {badge && passwordRequests > 0 && (
             <span
               className="grid min-w-5 place-items-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-black"
@@ -59,13 +59,18 @@ export function AccountMenu({ name, email, role }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted hover:bg-white/[0.06] hover:text-fg"
+        aria-label={`Account: ${name}`}
+        className="inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-muted hover:bg-white/[0.06] hover:text-fg sm:py-1.5"
       >
-        {name} <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
+        {/* Phones show an icon so the header fits on one line; the name is in the menu. */}
+        <UserRound className="size-5 sm:hidden" />
+        <span className="hidden sm:inline">{name}</span>
+        <ChevronDown className={cn("hidden size-4 transition-transform sm:block", open && "rotate-180")} />
       </button>
       {open && (
         <div className="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-md border border-white/15 bg-ink-900 shadow-lg">
           <div className="border-b border-white/[0.06] px-4 py-3">
+            <p className="truncate text-sm font-medium sm:hidden">{name}</p>
             <p className="truncate text-xs text-subtle">{email}</p>
             <p className="mt-0.5 text-xs font-medium text-muted">{role === "admin" ? "Admin" : "Staff"}</p>
           </div>

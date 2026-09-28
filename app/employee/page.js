@@ -36,12 +36,16 @@ export default async function EmployeeDashboard({ searchParams }) {
 
       {welcome && <ConsumeSearchParam name="welcome" />}
       {welcome && (
-        <Alert tone="brand" className="mb-6 flex items-center gap-2">
-          <PartyPopper className="size-4" /> You&apos;re all set! Take a minute to{" "}
-          <Link href="/employee/profile" className="font-medium underline underline-offset-4">
-            complete your profile
-          </Link>
-          .
+        <Alert tone="brand" className="mb-6 flex items-start gap-2">
+          <PartyPopper className="mt-0.5 size-4 shrink-0" />
+          {/* One text run, so on a phone the sentence wraps as a sentence instead of splitting into columns. */}
+          <span>
+            You&apos;re all set! Take a minute to{" "}
+            <Link href="/employee/profile" className="font-medium underline underline-offset-4">
+              complete your profile
+            </Link>
+            .
+          </span>
         </Alert>
       )}
 
@@ -63,7 +67,7 @@ export default async function EmployeeDashboard({ searchParams }) {
             title="Recent requests"
             icon={History}
             action={
-              <Link href="/employee/leaves" className="inline-flex items-center gap-1 text-xs text-brand-300 hover:text-brand-50">
+              <Link href="/employee/leaves" className="-my-1.5 inline-flex items-center gap-1 py-1.5 text-xs text-brand-300 hover:text-brand-50">
                 All <ArrowUpRight className="size-3.5" />
               </Link>
             }
@@ -91,7 +95,7 @@ export default async function EmployeeDashboard({ searchParams }) {
             title="Upcoming holidays"
             icon={CalendarDays}
             action={
-              <Link href="/employee/holidays" className="inline-flex items-center gap-1 text-xs text-brand-300 hover:text-brand-50">
+              <Link href="/employee/holidays" className="-my-1.5 inline-flex items-center gap-1 py-1.5 text-xs text-brand-300 hover:text-brand-50">
                 Calendar <ArrowUpRight className="size-3.5" />
               </Link>
             }

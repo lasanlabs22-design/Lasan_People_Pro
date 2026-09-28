@@ -40,7 +40,7 @@ export default async function EmployeeDetail({ params, searchParams }) {
 
   return (
     <>
-      <Link href="/admin/employees" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">
+      <Link href="/admin/employees" className="-my-1 mb-5 inline-flex items-center gap-1.5 py-1 text-sm text-muted hover:text-fg">
         <ArrowLeft className="size-4" /> All employees
       </Link>
 
