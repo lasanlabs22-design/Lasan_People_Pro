@@ -47,8 +47,8 @@ a login with the **workspace name** (for example `acme-tools`), an **employee ID
 
 1. Open the Lasan People web address your company gave you. If your admin sent you a link that ends with
    `?workspace=your-company`, the workspace is filled in for you.
-2. In **Workspace**, enter your company's workspace name, for example `acme-tools`. This device remembers it
-   for next time.
+2. In **Workspace**, enter your company's workspace name, for example `acme-tools`. The sign-in form always
+   starts empty, so nothing about the last person to sign in shows on a shared device.
 3. In **Employee ID or email**, enter your employee ID (for example `LS001`) or your work email.
 4. Enter your password and select **Sign in**. The eye icon shows or hides what you type.
 
