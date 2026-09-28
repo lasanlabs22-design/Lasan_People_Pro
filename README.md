@@ -350,7 +350,8 @@ Select a holiday on the calendar or in the list to edit it, or use the bin icon 
 - Created only by Lasan staff from the platform console (`/platform`), with the first admin and the default
   leave policy, holidays and settings; no public sign-up
 - Platform console: create, suspend and reactivate workspaces; manage the Lasan team (add staff with a temporary
-  password, reset passwords, deactivate); every staff member can change their own password
+  password, reset passwords, deactivate); every staff member can change their own password; an **Activity** page
+  lists every console action from an append-only audit trail
 - Sign-in by workspace name + employee ID/email; the same employee ID or email can exist in different workspaces
 - Workspace shown in the menu; login messages for new employees include a pre-filled sign-in link
 
@@ -360,7 +361,10 @@ Select a holiday on the calendar or in the list to edit it, or use the bin icon 
   resetting or changing a password signs the user out everywhere immediately
 - Every API route re-checks the user and workspace in the database (status + token version + role);
   `proxy.js` is only an optimistic redirect
-- Workspace and platform sign-in rate-limited; no user enumeration; append-only audit log
+- Workspace and platform sign-in rate-limited (an address the owner has used before can't be locked out by
+  strangers); no user enumeration; append-only audit logs for each workspace and for the console
+- Every page sends a Content Security Policy, HSTS, `X-Frame-Options: DENY` and a permissions policy that only
+  allows camera and location (`next.config.mjs`)
 - Platform staff live outside every workspace (private `app` schema, reached only through definer functions)
   and use separate tokens: a workspace token can't open the console, and a console token can't open a workspace
 - Geofence is enforced server-side (haversine distance; GPS accuracy forgiven up to 50 m)
@@ -441,8 +445,9 @@ Then sign in at `/platform/login`, select **Create workspace**, and send the new
 console shows. They must replace the password on first sign-in.
 
 The console has two roles. **Admins** manage the **Lasan team** page: they add people as Admin or Staff, change
-roles, deactivate accounts and give out temporary passwords. **Staff** set up and manage workspaces but can't see the
-team. Nobody can demote or deactivate themselves, and the console always keeps at least one active admin.
+roles, deactivate accounts and give out temporary passwords; they alone can suspend or reactivate a workspace and
+see the **Activity** audit trail. **Staff** create workspaces but can't suspend them or see the team. Nobody can
+demote or deactivate themselves, and the console always keeps at least one active admin.
 
 Forgot your password? Select **Forgot password?** on the console sign-in page and enter your email and the email of
 the admin you're asking. The request waits in that admin's **Lasan team** page until they give you a temporary

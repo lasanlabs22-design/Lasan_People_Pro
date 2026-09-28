@@ -143,7 +143,12 @@ export function WorkspaceStatusButton({ workspace }) {
       <Pause className="size-3.5" /> Suspend
     </ActionButton>
   ) : (
-    <ActionButton variant="success" size="sm" action={setWorkspaceStatus.bind(null, workspace.id, "active")}>
+    <ActionButton
+      variant="success"
+      size="sm"
+      action={setWorkspaceStatus.bind(null, workspace.id, "active")}
+      confirmText={`Reactivate ${workspace.name}? Everyone in it can sign in again.`}
+    >
       <Play className="size-3.5" /> Reactivate
     </ActionButton>
   );

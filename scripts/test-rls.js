@@ -246,6 +246,21 @@ try {
   await check("the audit log can't be rewritten", async () => {
     await asApp({ tenantId: A.id, role: "admin" }, (tx) => expectPgError("42501", () => tx`delete from audit_logs`));
   });
+
+  await check("a workspace admin can rename the company but not change its status or workspace name", async () => {
+    await asApp({ tenantId: A.id, role: "admin" }, async (tx) => {
+      await tx`update tenants set name = 'Renamed A' where id = ${A.id}`;
+      await expectPgError("42501", () => tx.savepoint((sp) => sp`update tenants set status = 'suspended' where id = ${A.id}`));
+      await expectPgError("42501", () => tx.savepoint((sp) => sp`update tenants set slug = 'stolen-name' where id = ${A.id}`));
+    });
+  });
+
+  await check("the app role can't read or rewrite the console's audit trail directly", async () => {
+    await asApp({}, async (tx) => {
+      await expectPgError("42501", () => tx.savepoint((sp) => sp`select * from app.platform_audit_logs`));
+      await expectPgError("42501", () => tx.savepoint((sp) => sp`delete from app.platform_audit_logs`));
+    });
+  });
 } finally {
   await ownerSql`delete from tenants where slug in (${A.slug}, ${B.slug})`;
   await Promise.all([appSql.end(), ownerSql.end(), closeDb()]);

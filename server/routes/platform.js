@@ -27,11 +27,22 @@ const publicAdmin = (a) => ({
   lastLoginAt: a.last_login_at ?? null,
 });
 
+// Failed sign-ins only, keyed like the workspace sign-in (routes/auth.js): a tight budget per
+// account from one address, a looser one per account overall that an address the account has
+// signed in from before is exempt from, so someone who knows a Lasan email can't lock its owner out.
 const WINDOW = 15 * 60_000;
 const perIp = createLimiter({ name: "platform:ip", windowMs: WINDOW, max: 20 });
-const perAccount = createLimiter({ name: "platform:account", windowMs: WINDOW, max: 10 });
+const perAccountIp = createLimiter({ name: "platform:account-ip", windowMs: WINDOW, max: 10 });
+const perAccount = createLimiter({ name: "platform:account", windowMs: WINDOW, max: 30 });
+const trustedAddress = createLimiter({ name: "platform:trusted", windowMs: 30 * 24 * 60 * 60_000, max: 1 });
 
 let dummyHash;
+
+/** Records a console action in the audit trail, as the signed-in platform admin. */
+const record = (c, action, target = {}) => {
+  const me = c.get("platformAdmin");
+  return platform.audit({ actorId: me?.id, actorEmail: me?.email, action, ip: clientIp(c), ...target });
+};
 
 export const platformAuthRoutes = new Hono();
 
@@ -41,8 +52,14 @@ platformAuthRoutes.post(
   async (c) => {
     const { email, password: plain } = c.req.valid("json");
     const ip = addressBlock(clientIp(c));
-    const account = email;
-    for (const [limiter, key] of [[perIp, ip], [perAccount, account]]) {
+    const here = `${email}|${ip}`;
+    const trusted = await trustedAddress.exceeded(here);
+    const keys = [
+      [perIp, ip],
+      [perAccountIp, here],
+      [perAccount, email],
+    ];
+    for (const [limiter, key] of trusted ? keys.filter(([l]) => l !== perAccount) : keys) {
       try {
         await limiter.check(key);
       } catch (err) {
@@ -55,11 +72,15 @@ platformAuthRoutes.post(
     // Same bcrypt work whether or not the account exists, so emails can't be probed by timing.
     const valid = await verifyPassword(plain, admin?.password_hash ?? (dummyHash ??= await hashPassword("no-such-account")));
     if (!admin || !valid || !admin.is_active) {
-      await Promise.all([perIp.hit(ip), perAccount.hit(account)]);
+      await Promise.all(keys.map(([limiter, key]) => limiter.hit(key)));
+      // Only real accounts are logged, so guessing at made-up emails can't flood the trail.
+      if (admin) await platform.audit({ actorId: admin.id, actorEmail: admin.email, action: "auth.login_failed", ip: clientIp(c) });
       throw unauthorized("Invalid email or password");
     }
-    await perAccount.reset(account);
+    await perAccountIp.reset(here);
+    await trustedAddress.hit(here);
     await platform.signedIn(admin.id);
+    await platform.audit({ actorId: admin.id, actorEmail: admin.email, action: "auth.login", ip: clientIp(c) });
     return c.json({ token: await signPlatformToken(admin), admin: publicAdmin(admin) });
   },
 );
@@ -139,6 +160,7 @@ platformRoutes.post(
     }
     // Every other session ends; this one continues with a fresh token.
     const tokenVersion = await platform.setPassword(admin.id, await hashPassword(newPassword), false);
+    await record(c, "auth.password_changed");
     return c.json({ token: await signPlatformToken({ ...admin, token_version: tokenVersion }) });
   },
 );
@@ -178,6 +200,7 @@ platformRoutes.post("/workspaces", validate("json", newWorkspaceSchema), async (
     admin: { name: input.name, email: input.email, employeeCode: input.employeeCode, password: input.password },
     createdBy: c.get("platformAdmin").email,
   });
+  await record(c, "workspace.created", { targetType: "workspace", targetId: tenant.id, targetLabel: `${tenant.name} (${tenant.slug})` });
   return c.json(
     {
       workspace: { id: tenant.id, slug: tenant.slug, name: tenant.name },
@@ -187,17 +210,45 @@ platformRoutes.post("/workspaces", validate("json", newWorkspaceSchema), async (
   );
 });
 
+// Suspending locks a whole company out, so it's an admin's call; staff set workspaces up.
 for (const [path, status] of [["suspend", "suspended"], ["activate", "active"]]) {
-  platformRoutes.post(`/workspaces/:id/${path}`, validate("param", uuidParam), async (c) => {
-    if (!(await platform.setWorkspaceStatus(c.req.valid("param").id, status))) throw notFound("Workspace");
+  platformRoutes.post(`/workspaces/:id/${path}`, requireAdminRole, validate("param", uuidParam), async (c) => {
+    const { id } = c.req.valid("param");
+    if (!(await platform.setWorkspaceStatus(id, status))) throw notFound("Workspace");
+    const workspace = (await platform.workspaces()).find((w) => w.id === id);
+    await record(c, status === "active" ? "workspace.reactivated" : "workspace.suspended", {
+      targetType: "workspace",
+      targetId: id,
+      targetLabel: workspace && `${workspace.name} (${workspace.slug})`,
+    });
     return c.json({ ok: true, status });
   });
 }
 
 /* ------------------------------ Team (admins only) ------------------------------ */
 
-// Staff never see the team: not its members, not the admins, not the password requests.
-for (const path of ["/team", "/team/*", "/password-requests", "/password-requests/*"]) platformRoutes.use(path, requireAdminRole);
+// Staff never see the team: not its members, not the admins, not the password requests, not the audit trail.
+for (const path of ["/team", "/team/*", "/password-requests", "/password-requests/*", "/audit"]) platformRoutes.use(path, requireAdminRole);
+
+platformRoutes.get("/audit", validate("query", z.object({ limit: z.coerce.number().int().min(1).max(500).default(200) })), async (c) => {
+  const rows = await platform.auditLog(c.req.valid("query").limit);
+  return c.json({
+    entries: rows.map((r) => ({
+      id: r.id,
+      at: r.created_at,
+      actorEmail: r.actor_email,
+      actorName: r.actor_name,
+      action: r.action,
+      targetType: r.target_type,
+      targetLabel: r.target_label,
+      ip: r.ip,
+      meta: r.meta,
+    })),
+  });
+});
+
+/** A team member's email, for the audit trail. */
+const memberLabel = async (id) => (await platform.adminById(id))?.email ?? null;
 
 platformRoutes.get("/team", async (c) => {
   const rows = await platform.team();
@@ -230,6 +281,7 @@ platformRoutes.post(
   async (c) => {
     const { name, email, role, password: plain } = c.req.valid("json");
     const id = await platform.createAdmin({ email, name, role, passwordHash: await hashPassword(plain), createdBy: c.get("platformAdmin").id });
+    await record(c, "team.added", { targetType: "platform_admin", targetId: id, targetLabel: email, meta: { role } });
     return c.json({ member: { id, name, email, role } }, 201);
   },
 );
@@ -248,17 +300,23 @@ platformRoutes.post("/team/:id/reset-password", validate("param", uuidParam), va
   const tv = await platform.setPassword(id, await hashPassword(c.req.valid("json").password), true);
   if (tv == null) throw notFound("Team member");
   await platform.closePasswordRequest(id, c.get("platformAdmin").id);
+  await record(c, "team.password_reset", { targetType: "platform_admin", targetId: id, targetLabel: await memberLabel(id) });
   return c.json({ ok: true });
 });
 
 platformRoutes.post("/team/:id/role", validate("param", uuidParam), validate("json", z.object({ role: z.enum(ROLES) })), async (c) => {
-  if (!(await platform.setRole(colleague(c), c.req.valid("json").role))) throw notFound("Team member");
+  const id = colleague(c);
+  const { role } = c.req.valid("json");
+  if (!(await platform.setRole(id, role))) throw notFound("Team member");
+  await record(c, "team.role_changed", { targetType: "platform_admin", targetId: id, targetLabel: await memberLabel(id), meta: { role } });
   return c.json({ ok: true });
 });
 
 for (const [path, active] of [["deactivate", false], ["activate", true]]) {
   platformRoutes.post(`/team/:id/${path}`, validate("param", uuidParam), async (c) => {
-    if (!(await platform.setActive(colleague(c), active))) throw notFound("Team member");
+    const id = colleague(c);
+    if (!(await platform.setActive(id, active))) throw notFound("Team member");
+    await record(c, active ? "team.activated" : "team.deactivated", { targetType: "platform_admin", targetId: id, targetLabel: await memberLabel(id) });
     return c.json({ ok: true, active });
   });
 }
@@ -276,5 +334,6 @@ platformRoutes.post("/password-requests/:id/dismiss", validate("param", uuidPara
   const request = mine.find((r) => r.id === c.req.valid("param").id);
   if (!request) throw notFound("Request");
   await platform.closePasswordRequest(request.requester_id, c.get("platformAdmin").id);
+  await record(c, "team.password_request_dismissed", { targetType: "platform_admin", targetId: request.requester_id, targetLabel: request.email });
   return c.json({ ok: true });
 });

@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, ChevronDown, KeyRound, LogOut, UsersRound } from "lucide-react";
+import { Building2, ChevronDown, History, KeyRound, LogOut, UsersRound } from "lucide-react";
 import { cn } from "@/components/ui";
 
 const TABS = [
   { href: "/platform", label: "Workspaces", icon: Building2 },
-  // The team, its admins and their password requests are for admins only.
-  { href: "/platform/team", label: "Lasan team", icon: UsersRound, adminOnly: true },
+  // The team, its admins, their password requests and the audit trail are for admins only.
+  { href: "/platform/team", label: "Lasan team", icon: UsersRound, adminOnly: true, badge: true },
+  { href: "/platform/activity", label: "Activity", icon: History, adminOnly: true },
 ];
 
 export function ConsoleNav({ isAdmin, passwordRequests = 0 }) {
@@ -18,7 +19,7 @@ export function ConsoleNav({ isAdmin, passwordRequests = 0 }) {
   if (tabs.length < 2) return null;
   return (
     <nav className="mb-8 flex gap-1 rounded-xl border border-white/[0.06] bg-white/[0.02] p-1 sm:w-fit">
-      {tabs.map(({ href, label, icon: Icon, adminOnly }) => (
+      {tabs.map(({ href, label, icon: Icon, badge }) => (
         <Link
           key={href}
           href={href}
@@ -28,7 +29,7 @@ export function ConsoleNav({ isAdmin, passwordRequests = 0 }) {
           )}
         >
           <Icon className="size-4" /> {label}
-          {adminOnly && passwordRequests > 0 && (
+          {badge && passwordRequests > 0 && (
             <span
               className="grid min-w-5 place-items-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-ink-950"
               title={`${passwordRequests} password request${passwordRequests === 1 ? "" : "s"} waiting`}
