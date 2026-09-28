@@ -57,9 +57,16 @@ export async function saveProfile(_prev, fd) {
   ]) {
     if (fd.has(k)) body[k] = String(fd.get(k)).trim();
   }
-  return run(() => api("/me/profile", { method: "PUT", body }), "/employee/profile");
+  return saveOwnProfile(body);
 }
 
 export async function saveAvatar(dataUrl) {
-  return run(() => api("/me/profile", { method: "PUT", body: { avatar: dataUrl } }), "/employee/profile");
+  return saveOwnProfile({ avatar: dataUrl });
+}
+
+// Admins edit their own profile at /admin/profile; refresh that area too, so the sidebar photo updates.
+async function saveOwnProfile(body) {
+  const res = await run(() => api("/me/profile", { method: "PUT", body }), "/employee/profile", "/admin/profile");
+  if (res.ok) revalidatePath("/admin", "layout");
+  return res;
 }

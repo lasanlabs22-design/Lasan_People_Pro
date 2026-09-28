@@ -32,6 +32,7 @@ const NAV = {
     { href: "/admin/attendance", label: "Attendance", icon: Clock3 },
     { href: "/admin/holidays", label: "Holidays", icon: CalendarDays },
     { href: "/admin/settings", label: "Settings", icon: Settings2 },
+    { href: "/admin/profile", label: "My profile", icon: UserRound },
   ],
   employee: [
     { href: "/employee", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -99,11 +100,18 @@ export function Shell({ user, tenant, badges = {}, children }) {
 
   const account = (
     <div className="mt-6 flex items-center gap-3 rounded-md border border-white/10 bg-white/[0.02] p-2.5">
-      <Avatar src={user.avatar} name={user.name} size={36} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{user.name}</p>
-        <p className="truncate text-xs text-subtle">{user.role === "admin" ? "Administrator" : user.designation || user.employeeCode}</p>
-      </div>
+      {/* The name card opens your own profile, in either area. */}
+      <Link
+        href={user.role === "admin" ? "/admin/profile" : "/employee/profile"}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-md hover:opacity-80"
+        title="My profile"
+      >
+        <Avatar src={user.avatar} name={user.name} size={36} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{user.name}</p>
+          <p className="truncate text-xs text-subtle">{user.role === "admin" ? "Administrator" : user.designation || user.employeeCode}</p>
+        </div>
+      </Link>
       {/* POST so link prefetching can never sign anyone out. */}
       <form action="/logout" method="post">
         <button className="rounded-lg p-2 text-subtle hover:bg-white/10 hover:text-rose-300" aria-label="Sign out" title="Sign out">
