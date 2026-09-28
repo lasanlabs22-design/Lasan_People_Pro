@@ -4,7 +4,8 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Droplet, HeartPulse, Loader2, Trash2, UserRound } from "lucide-react";
 import { saveAvatar, saveProfile } from "@/app/actions/employee";
-import { SubmitButton, useFormAction } from "@/components/client";
+import { Modal, SubmitButton, useFormAction } from "@/components/client";
+import { PhotoCropper } from "@/components/photo-cropper";
 import { Alert, Avatar, Card, CardHeader, Field, Input, Select, Textarea, cn } from "@/components/ui";
 import { BLOOD_GROUPS } from "@/lib/format";
 import { todayIso } from "@/lib/dates";
@@ -16,15 +17,13 @@ const latestBirthDate = () => {
   return `${Number(today.slice(0, 4)) - MIN_AGE}${today.slice(4)}`;
 };
 
-/** Center-crops to a square and re-encodes small enough to store inline. */
-async function toAvatarDataUrl(file) {
-  const bitmap = await createImageBitmap(file);
-  const side = Math.min(bitmap.width, bitmap.height);
+/** Draws the square the person chose in the cropper and re-encodes it small enough to upload. */
+function toAvatarDataUrl(bitmap, { sx, sy, size }) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = AVATAR_PX;
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, AVATAR_PX, AVATAR_PX);
-  bitmap.close?.();
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bitmap, sx, sy, size, size, 0, 0, AVATAR_PX, AVATAR_PX);
   for (const q of [0.85, 0.7, 0.55]) {
     const url = canvas.toDataURL("image/jpeg", q);
     if (url.length < 150_000) return url;
@@ -37,26 +36,36 @@ export function AvatarUploader({ name, avatar }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(null);
+  // The photo just picked, waiting to be positioned in the cropper.
+  const [picked, setPicked] = useState(null);
   // Refresh so the sidebar avatar and profile-complete meter pick up the change.
   const router = useRouter();
 
-  const upload = (file) => {
+  const choose = (file) => {
     setError(null);
+    if (input.current) input.current.value = ""; // so picking the same file again still opens the cropper
     if (!file) return;
     if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) return setError("Use a PNG, JPG or WEBP image.");
     if (file.size > 10 * 1024 * 1024) return setError("Pick an image under 10 MB.");
+    setPicked(file);
+  };
+
+  const save = (bitmap, rect) => {
+    let dataUrl;
+    try {
+      dataUrl = toAvatarDataUrl(bitmap, rect);
+    } catch (e) {
+      setPicked(null);
+      return setError(e.message);
+    }
     start(async () => {
-      try {
-        const dataUrl = await toAvatarDataUrl(file);
-        setPreview(dataUrl);
-        const res = await saveAvatar(dataUrl);
-        if (!res.ok) {
-          setPreview(null);
-          setError(res.error);
-        } else router.refresh();
-      } catch (e) {
-        setError(e.message);
-      }
+      setPreview(dataUrl);
+      const res = await saveAvatar(dataUrl);
+      setPicked(null);
+      if (!res.ok) {
+        setPreview(null);
+        setError(res.error);
+      } else router.refresh();
     });
   };
 
@@ -78,8 +87,17 @@ export function AvatarUploader({ name, avatar }) {
         >
           {pending ? <Loader2 className="size-6 animate-spin" /> : <Camera className="size-6" />}
         </button>
-        <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => upload(e.target.files?.[0])} />
+        <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => choose(e.target.files?.[0])} />
       </div>
+      <Modal
+        open={Boolean(picked)}
+        onClose={() => !pending && setPicked(null)}
+        title="Position your photo"
+        description="Only what's inside the circle is saved."
+        className="max-w-md"
+      >
+        {picked && <PhotoCropper file={picked} busy={pending} onCancel={() => setPicked(null)} onCrop={save} />}
+      </Modal>
       <div className="mt-3 flex gap-3 text-xs">
         <button type="button" onClick={() => input.current?.click()} className="text-brand-300 hover:text-brand-50">
           {shown ? "Change photo" : "Upload photo"}
