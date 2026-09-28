@@ -43,7 +43,34 @@ export default async function ActivityPage() {
         {entries.length === 0 ? (
           <EmptyState icon={History} title="Nothing recorded yet" description="Console actions will appear here." />
         ) : (
-          <Table className="mt-3">
+          <>
+          {/* Phones: one entry per event instead of a table that scrolls sideways. */}
+          <ul className="mt-3 divide-y divide-white/[0.05] sm:hidden">
+            {entries.map((e) => {
+              const [label, tone] = ACTIONS[e.action] ?? [e.action, "slate"];
+              return (
+                <li key={e.id} className="space-y-1.5 px-5 py-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <Badge tone={tone}>{label}</Badge>
+                    <span className="shrink-0 text-xs text-subtle">
+                      {fmtDay(e.at)} · {fmtTime(e.at)}
+                    </span>
+                  </div>
+                  {e.targetLabel && (
+                    <p className="text-sm">
+                      {e.targetLabel}
+                      {e.meta?.role && <span className="ml-1 text-xs text-subtle">→ {e.meta.role}</span>}
+                    </p>
+                  )}
+                  <p className="truncate text-xs text-muted">
+                    by {e.actorName ?? e.actorEmail ?? "Unknown"}
+                    {e.actorName && ` · ${e.actorEmail}`}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+          <Table className="mt-3 hidden sm:block">
             <thead className="border-b border-white/[0.06]">
               <tr>
                 <Th>When</Th>
@@ -76,6 +103,7 @@ export default async function ActivityPage() {
               })}
             </tbody>
           </Table>
+          </>
         )}
         <div className="h-2" />
       </Card>

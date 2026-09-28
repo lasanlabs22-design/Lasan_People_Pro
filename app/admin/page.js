@@ -71,7 +71,7 @@ export default async function AdminOverview({ searchParams }) {
             subtitle="Oldest first"
             icon={Inbox}
             action={
-              <Link href="/admin/leaves" className="inline-flex items-center gap-1 text-xs text-brand-300 hover:text-brand-50">
+              <Link href="/admin/leaves" className="-my-1.5 inline-flex items-center gap-1 py-1.5 text-xs text-brand-300 hover:text-brand-50">
                 View all <ArrowUpRight className="size-3.5" />
               </Link>
             }
@@ -99,7 +99,7 @@ export default async function AdminOverview({ searchParams }) {
         <div className="grid gap-6">
           <Card>
             <CardHeader title="Today's roll-call" subtitle={rollSubtitle} icon={UserCheck}
-              action={<Link href="/admin/attendance" className="text-xs text-brand-300 hover:text-brand-50">Details</Link>} />
+              action={<Link href="/admin/attendance" className="-my-1.5 inline-block py-1.5 text-xs text-brand-300 hover:text-brand-50">Details</Link>} />
             <div className="px-5 pb-5 pt-4">
               <div className="flex h-2.5 overflow-hidden rounded-full bg-white/[0.06]">
                 <div className="bg-emerald-400" style={{ width: `${pct(roll.summary.present, roll.summary.total)}%` }} />
@@ -123,7 +123,7 @@ export default async function AdminOverview({ searchParams }) {
 
           <Card>
             <CardHeader title="Upcoming holidays" subtitle="Next 90 days" icon={CalendarDays}
-              action={<Link href="/admin/holidays" className="text-xs text-brand-300 hover:text-brand-50">Manage</Link>} />
+              action={<Link href="/admin/holidays" className="-my-1.5 inline-block py-1.5 text-xs text-brand-300 hover:text-brand-50">Manage</Link>} />
             <ul className="space-y-1 px-3 pb-4 pt-3">
               {upcomingHolidays.length === 0 && <li className="px-2 py-3 text-sm text-subtle">Nothing scheduled.</li>}
               {upcomingHolidays.map((h) => (

@@ -8,10 +8,12 @@ export default async function ConsoleLayout({ children }) {
   const { admin } = await loadPlatform("/platform/me");
   return (
     <div className="mx-auto min-h-dvh max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <header className="mb-6 flex items-center justify-between gap-3 sm:mb-8">
         <div className="flex items-center gap-3">
           <Logo />
-          <Badge tone="amber">Platform</Badge>
+          <span className="hidden sm:block">
+            <Badge tone="amber">Platform</Badge>
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />

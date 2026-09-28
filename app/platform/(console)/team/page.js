@@ -41,7 +41,30 @@ export default async function TeamPage() {
 
       <Card>
         <CardHeader title="Team" subtitle={`${team.filter((m) => m.active).length} active · ${admins} admin${admins === 1 ? "" : "s"}`} icon={UsersRound} />
-        <Table className="mt-3">
+        {/* Phones: one card per person so status and actions aren't pushed off-screen. */}
+        <ul className="mt-3 divide-y divide-white/[0.05] sm:hidden">
+          {team.map((m) => (
+            <li key={m.id} className="space-y-2.5 px-5 py-3.5">
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 text-sm font-medium">
+                  <span className="truncate">{m.name}</span>
+                  {m.id === me.id && <Badge tone="brand">You</Badge>}
+                </p>
+                <p className="truncate text-xs text-muted">{m.email}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone={m.role === "admin" ? "amber" : "slate"}>{m.role}</Badge>
+                <MemberStatus member={m} />
+              </div>
+              {m.id !== me.id && (
+                <div className="[&>div]:justify-start">
+                  <StaffActions member={m} />
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+        <Table className="mt-3 hidden sm:block">
           <thead className="border-b border-white/[0.06]">
             <tr>
               <Th>Name</Th>
@@ -71,19 +94,7 @@ export default async function TeamPage() {
                 </Td>
                 <Td className="hidden text-muted lg:table-cell">{fmtDay(m.lastLoginAt) ?? "Never"}</Td>
                 <Td>
-                  {!m.active ? (
-                    <Badge tone="rose" dot>
-                      Deactivated
-                    </Badge>
-                  ) : m.mustChangePassword ? (
-                    <Badge tone="amber" dot className="normal-case">
-                      Temporary password
-                    </Badge>
-                  ) : (
-                    <Badge tone="emerald" dot>
-                      Active
-                    </Badge>
-                  )}
+                  <MemberStatus member={m} />
                 </Td>
                 <Td className="text-right">{m.id !== me.id && <StaffActions member={m} />}</Td>
               </tr>
@@ -93,5 +104,27 @@ export default async function TeamPage() {
         <div className="h-2" />
       </Card>
     </>
+  );
+}
+
+function MemberStatus({ member }) {
+  if (!member.active) {
+    return (
+      <Badge tone="rose" dot>
+        Deactivated
+      </Badge>
+    );
+  }
+  if (member.mustChangePassword) {
+    return (
+      <Badge tone="amber" dot className="normal-case">
+        Temporary password
+      </Badge>
+    );
+  }
+  return (
+    <Badge tone="emerald" dot>
+      Active
+    </Badge>
   );
 }

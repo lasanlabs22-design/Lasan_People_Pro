@@ -99,7 +99,7 @@ export function AvatarUploader({ name, avatar }) {
         {picked && <PhotoCropper file={picked} busy={pending} onCancel={() => setPicked(null)} onCrop={save} />}
       </Modal>
       <div className="mt-3 flex gap-3 text-xs">
-        <button type="button" onClick={() => input.current?.click()} className="text-brand-300 hover:text-brand-50">
+        <button type="button" onClick={() => input.current?.click()} className="-my-1.5 py-1.5 text-brand-300 hover:text-brand-50">
           {shown ? "Change photo" : "Upload photo"}
         </button>
         {shown && (
@@ -115,7 +115,7 @@ export function AvatarUploader({ name, avatar }) {
                 else setError(res.error);
               })
             }
-            className="inline-flex items-center gap-1 text-subtle hover:text-rose-300"
+            className="-my-1.5 inline-flex items-center gap-1 py-1.5 text-subtle hover:text-rose-300"
           >
             <Trash2 className="size-3" /> Remove
           </button>
