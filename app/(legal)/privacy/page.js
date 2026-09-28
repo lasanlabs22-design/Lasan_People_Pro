@@ -68,7 +68,7 @@ const SECTIONS = [
         list: [
           "You can see your own profile, attendance, photos and leave records.",
           "Your Organisation's administrators can see and manage the records of the people in their Organisation.",
-          "Other employees can see only limited directory details, such as names on leave calendars and approvals.",
+          "Your colleagues in the same Organisation can see your directory details only: your name, profile photo, employee ID, work email, designation and department. They cannot see your personal contact details, date of birth, blood group, address, emergency contact, attendance, leave or ratings.",
           `Authorised ${L.company} staff may access data only where needed to provide, secure or support the service, under confidentiality obligations.`,
           "Service providers that host and operate our infrastructure process data on our behalf under contract.",
           "Authorities, where we are required to disclose data by law.",
