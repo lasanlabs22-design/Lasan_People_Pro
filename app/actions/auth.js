@@ -35,7 +35,7 @@ export async function login(_prev, formData) {
   } catch (err) {
     return formError(err);
   }
-  await setSession(res.token, res.user.role, res.tenant.slug);
+  await setSession(res.token, res.user.role);
   if (res.user.mustChangePassword) redirect("/change-password");
   redirect(safeNext(formData.get("next"), res.user.role) ?? homeFor(res.user.role));
 }
@@ -52,6 +52,6 @@ export async function changePassword(_prev, formData) {
   } catch (err) {
     return actionError(err);
   }
-  await setSession(res.token, res.user.role, res.tenant.slug);
+  await setSession(res.token, res.user.role);
   redirect(`${homeFor(res.user.role)}?welcome=1`);
 }

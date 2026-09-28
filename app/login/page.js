@@ -2,7 +2,7 @@ import { CalendarCheck2, MapPinned, ShieldCheck, Sparkles } from "lucide-react";
 import { Logo } from "@/components/brand";
 import { Alert } from "@/components/ui";
 import { PoweredBy } from "@/components/powered-by";
-import { getWorkspace } from "@/lib/session";import { LoginForm } from "./login-form";
+import { LoginForm } from "./login-form";
 
 export const metadata = { title: "Sign in" };
 
@@ -14,7 +14,8 @@ const FEATURES = [
 
 export default async function LoginPage({ searchParams }) {
   const { next, reason, workspace } = await searchParams;
-  const prefill = typeof workspace === "string" ? workspace.toLowerCase() : await getWorkspace();
+  // Only a login link from an admin (…/login?workspace=acme) fills in the workspace; otherwise it starts empty.
+  const prefill = typeof workspace === "string" ? workspace.toLowerCase() : "";
   return (
     <main className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <section className="relative hidden overflow-hidden border-r border-white/5 p-12 lg:flex lg:flex-col">

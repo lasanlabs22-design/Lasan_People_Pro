@@ -11,7 +11,8 @@ export function LoginForm({ next, workspace }) {
   const [show, setShow] = useState(false);
 
   return (
-    <form onSubmit={onSubmit} className="mt-8 space-y-5">
+    // Starts empty: browsers are asked not to fill in a remembered workspace, ID or password.
+    <form onSubmit={onSubmit} className="mt-8 space-y-5" autoComplete="off">
       <input type="hidden" name="next" value={next} />
       <Alert>{state?.error}</Alert>
 
@@ -23,7 +24,7 @@ export function LoginForm({ next, workspace }) {
             name="workspace"
             required
             defaultValue={workspace}
-            autoComplete="organization"
+            autoComplete="off"
             autoCapitalize="none"
             spellCheck={false}
             autoFocus={!workspace}
@@ -40,7 +41,7 @@ export function LoginForm({ next, workspace }) {
             id="identifier"
             name="identifier"
             required
-            autoComplete="username"
+            autoComplete="off"
             autoFocus={Boolean(workspace)}
             placeholder="LS001 or you@company.com"
             className="field pl-10"
@@ -56,7 +57,7 @@ export function LoginForm({ next, workspace }) {
             name="password"
             type={show ? "text" : "password"}
             required
-            autoComplete="current-password"
+            autoComplete="off"
             placeholder="••••••••"
             className="field px-10"
           />
