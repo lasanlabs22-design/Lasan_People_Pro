@@ -656,6 +656,8 @@ try {
 } finally {
   await ownerSql`delete from tenants where slug in (${W.slug}, ${P.slug})`;
   await ownerSql`delete from app.platform_admins where email in (${P.email}, ${`colleague-${suffix}@app.test`}, ${`admin2-${suffix}@app.test`}, ${`forgot-${suffix}@app.test`})`;
+  // The console's Activity log is append-only for the app, so the run removes its own entries here.
+  await ownerSql`delete from app.platform_audit_logs where actor_email like ${`%-${suffix}@app.test`} or target_label like ${`%${suffix}%`}`;
   await deletePhotosByPrefix(`${PHOTO_FOLDER}/`);
   await Promise.all([ownerSql.end(), closeDb()]);
   console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}. Test workspace and photos removed.`);
