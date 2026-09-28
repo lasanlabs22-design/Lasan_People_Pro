@@ -210,6 +210,30 @@ export function EmployeesSkeleton() {
   );
 }
 
+export function DirectorySkeleton() {
+  return (
+    <Page>
+      <Header />
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row">
+        <Bone className="h-10 flex-1 rounded-xl" />
+        <Bone className="h-10 w-60 rounded-xl" />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 9 }, (_, i) => (
+          <div key={i} className="glass flex gap-3.5 rounded-2xl p-4">
+            <Bone className="size-12 shrink-0 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Bone className="h-4 w-2/3" />
+              <Bone className="h-3 w-1/2" />
+              <Bone className="h-3 w-3/4" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </Page>
+  );
+}
+
 export function EmployeeDetailSkeleton() {
   return (
     <Page>

@@ -11,6 +11,7 @@ import { leaveTypeRoutes, holidayRoutes, orgRoutes, configRoutes } from "./route
 import { attendanceRoutes, adminAttendanceRoutes } from "./routes/attendance.js";
 import { employeeRoutes } from "./routes/employees.js";
 import { overviewRoutes } from "./routes/overview.js";
+import { directoryRoutes } from "./routes/directory.js";
 import { platformAuthRoutes, platformRoutes } from "./routes/platform.js";
 
 // Postgres unique-constraint names → the form field they belong to. All are per tenant.
@@ -48,6 +49,7 @@ export function createApp() {
   api.route("/leave-types", leaveTypeRoutes);
   api.route("/holidays", holidayRoutes);
   api.route("/attendance", attendanceRoutes);
+  api.route("/directory", directoryRoutes);
   api.route("/admin/overview", overviewRoutes);
   api.route("/admin/employees", employeeRoutes);
   api.route("/admin/leaves", adminLeaveRoutes);

@@ -255,6 +255,17 @@ try {
     });
   });
 
+  await check("the directory shows only your own workspace", async () => {
+    const photo = "data:image/png;base64,iVBORw0KGgo=";
+    assert.equal((await call("/me/profile", { method: "PUT", token: A.token, body: { avatar: photo } })).status, 200);
+    const b = await call("/directory", { token: B.token });
+    assert.equal(b.status, 200);
+    assert.ok(b.body.people.length > 0 && !b.body.people.some((p) => p.id === A.adminId), "B's directory has nobody from A");
+    assert.equal((await call(`/directory/${A.adminId}/photo`, { token: B.token })).status, 404, "B can't fetch A's photo by id");
+    const none = await asApp({}, (tx) => tx`select count(*)::int as n from app.directory()`);
+    assert.equal(none[0].n, 0, "with no workspace in context the directory is empty");
+  });
+
   await check("the app role can't read or rewrite the console's audit trail directly", async () => {
     await asApp({}, async (tx) => {
       await expectPgError("42501", () => tx.savepoint((sp) => sp`select * from app.platform_audit_logs`));

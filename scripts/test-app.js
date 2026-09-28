@@ -248,6 +248,33 @@ try {
     ok(await save(""));
   });
 
+  console.log("Directory");
+  await check("employees see active colleagues' work details only, with photos on request", async () => {
+    const colleague = await person("DIR1");
+    const leaver = await person("DIR2");
+    const photo = "data:image/png;base64,iVBORw0KGgo=";
+    ok(await call("/me/profile", { method: "PUT", token: colleague.token, body: { avatar: photo, phone: "+91 98765 43210", bloodGroup: "O+" } }));
+    ok(await call("/me/profile", { method: "PUT", token: leaver.token, body: { avatar: photo } }));
+    ok(await call(`/admin/employees/${leaver.id}/revoke`, { method: "POST", token: W.token }));
+
+    const res = await call("/directory", { token: worker.token });
+    ok(res);
+    const ids = res.body.people.map((p) => p.id);
+    assert.ok(ids.includes(colleague.id) && ids.includes(W.adminId), "colleagues and admins are listed");
+    assert.ok(!ids.includes(leaver.id), "revoked people are not listed");
+    const entry = res.body.people.find((p) => p.id === colleague.id);
+    assert.deepEqual(Object.keys(entry).sort(), ["department", "designation", "email", "employeeCode", "hasPhoto", "id", "name", "role"]);
+    assert.equal(entry.hasPhoto, true);
+
+    const got = await call(`/directory/${colleague.id}/photo`, { token: worker.token });
+    ok(got);
+    assert.equal(got.body.photo, photo);
+    assert.equal((await call(`/directory/${leaver.id}/photo`, { token: worker.token })).status, 404);
+    assert.equal((await call("/directory/00000000-0000-4000-8000-000000000000/photo", { token: worker.token })).status, 404);
+    // Profiles themselves stay private: the colleague's phone and blood group aren't reachable.
+    assert.equal((await call(`/admin/employees/${colleague.id}`, { token: worker.token })).status, 403);
+  });
+
   console.log("Sign-in security");
   const login = (identifier, password, ip) =>
     call("/auth/login", { method: "POST", body: { workspace: W.slug, identifier, password }, headers: ip ? { "x-forwarded-for": ip } : {} });

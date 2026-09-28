@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CalendarRange,
   Clock3,
+  Contact,
   Inbox,
   LayoutDashboard,
   LogOut,
@@ -37,6 +38,7 @@ const NAV = {
     { href: "/employee/leaves", label: "My leaves", icon: CalendarRange },
     { href: "/employee/attendance", label: "Attendance", icon: Clock3 },
     { href: "/employee/holidays", label: "Holidays", icon: CalendarDays },
+    { href: "/employee/directory", label: "Directory", icon: Contact },
     { href: "/employee/profile", label: "Profile", icon: UserRound },
   ],
 };
@@ -165,7 +167,7 @@ function BottomNav({ items, pathname }) {
       className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ink-900 lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <ul className="mx-auto grid max-w-lg grid-cols-5">
+      <ul className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
         {items.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
           return (
