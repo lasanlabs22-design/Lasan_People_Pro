@@ -5,6 +5,7 @@ import { db, schema } from "../db/client.js";
 import { publicUser } from "../lib/auth.js";
 import { BLOOD_GROUPS, isoDate, optionalText } from "../lib/validators.js";
 import { todayIn } from "../lib/dates.js";
+import { avatarUrl, deletePhoto, storePhoto } from "../lib/photos.js";
 import { validate } from "../middleware/validate.js";
 
 const { profiles } = schema;
@@ -44,9 +45,12 @@ const profileSchema = z.object({
   emergencyContactPhone: phone,
 });
 
+// The photo goes out as a link to /profile-photo, never as the stored value itself.
+const presentProfile = (p) => ({ ...p, avatar: avatarUrl(p.userId, p.avatar) });
+
 export async function loadProfile(userId) {
   const [p] = await db.select().from(profiles).where(eq(profiles.userId, userId));
-  return p ?? { userId };
+  return p ? presentProfile(p) : { userId };
 }
 
 meRoutes.get("/profile", async (c) => {
@@ -59,10 +63,20 @@ meRoutes.put("/profile", validate("json", profileSchema), async (c) => {
   const data = c.req.valid("json");
   // Only touch fields that were sent, so the avatar can be updated independently.
   const patch = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+
+  // A new photo goes to photo storage; the one it replaces (or that was removed) is deleted after.
+  let replaced = null;
+  if (patch.avatar !== undefined) {
+    const [current] = await db.select({ avatar: profiles.avatar }).from(profiles).where(eq(profiles.userId, user.id));
+    replaced = current?.avatar ?? null;
+    if (patch.avatar) patch.avatar = await storePhoto(patch.avatar, "avatars");
+  }
+
   const [profile] = await db
     .insert(profiles)
     .values({ userId: user.id, ...patch })
     .onConflictDoUpdate({ target: profiles.userId, set: { ...patch, updatedAt: new Date() } })
     .returning();
-  return c.json({ profile });
+  if (replaced && replaced !== profile.avatar) await deletePhoto(replaced);
+  return c.json({ profile: presentProfile(profile) });
 });

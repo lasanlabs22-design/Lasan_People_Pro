@@ -139,6 +139,12 @@ export const platform = {
   },
 };
 
+/** Check-in photo retention (db/migrations/0011): runs outside any workspace, like the console. */
+export const punchPhotoRetention = {
+  expired: (days, limit) => root().pool`select * from app.expired_punch_photos(${days}, ${limit})`,
+  forget: (attendanceId, kind) => root().pool`select app.forget_punch_photo(${attendanceId}, ${kind})`,
+};
+
 export async function closeDb() {
   await globalThis.__lasanDb?.pool.end({ timeout: 5 });
   globalThis.__lasanDb = undefined;

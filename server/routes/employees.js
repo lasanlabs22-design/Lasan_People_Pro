@@ -8,6 +8,7 @@ import { todayIn, yearRange } from "../lib/dates.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { isoDate, monthQuery, optionalText, password, uuidParam, yearQuery } from "../lib/validators.js";
 import { audit } from "../lib/audit.js";
+import { avatarUrl } from "../lib/photos.js";
 import { requireRole } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 import { leaveQuery } from "./leaves.js";
@@ -53,7 +54,7 @@ employeeRoutes.get(
     return c.json({
       employees: rows.map((r) => ({
         ...publicUser(r.user),
-        avatar: r.avatar ?? null,
+        avatar: avatarUrl(r.user.id, r.avatar),
         rating: r.avgScore ? Number(Number(r.avgScore).toFixed(1)) : null,
         ratingCount: Number(r.ratingCount ?? 0),
       })),

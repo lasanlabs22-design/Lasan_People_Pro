@@ -108,7 +108,7 @@ function Photo({ person }) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- served by our own route; next/image adds nothing here
       <img
-        src={`/directory-photo/${person.id}`}
+        src={`/profile-photo/${person.id}`}
         alt=""
         loading="lazy"
         onError={() => setFailed(true)}

@@ -40,7 +40,7 @@ const SECTIONS = [
     title: "Camera and location",
     body: [
       "The service asks your browser for your location only at the moment you check in or out, and only when your Organisation requires it. It does not track you at other times or in the background.",
-      "The camera is used only when photo check-in is turned on for you, and only while the check-in screen is open. The photo is stored with that day's attendance record so that your administrators can review it. Face-capture photos are not used for automated face recognition.",
+      "The camera is used only when photo check-in is turned on for you, and only while the check-in screen is open. The photo is linked to that day's attendance record so that your administrators can review it, and is deleted automatically after 7 days; the attendance record itself is kept. Face-capture photos are not used for automated face recognition.",
       "You can refuse camera or location access in your browser at any time; if your Organisation requires them, you may then be unable to record attendance and should speak to your administrator.",
     ],
   },
@@ -103,7 +103,7 @@ const SECTIONS = [
     id: "retention",
     title: "How long we keep it",
     body: [
-      `We keep personal data for as long as your Organisation uses the service, or for a shorter period your Organisation sets. When your Organisation's subscription ends, we delete its data within ${L.retentionAfterTermination}, unless the law requires us to keep some of it for longer. Your Organisation may ask us to delete data earlier.`,
+      `Face-capture photos from check-in and check-out are deleted automatically 7 days after they are taken. Profile photos are kept until you replace or remove them. We keep other personal data for as long as your Organisation uses the service, or for a shorter period your Organisation sets. When your Organisation's subscription ends, we delete its data within ${L.retentionAfterTermination}, unless the law requires us to keep some of it for longer. Your Organisation may ask us to delete data earlier.`,
     ],
   },
   {

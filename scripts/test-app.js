@@ -11,12 +11,31 @@ import bcrypt from "bcryptjs";
 import postgres from "postgres";
 import { getApp } from "../server/app.js";
 import { closeDb } from "../server/db/client.js";
+import { deletePhotosByPrefix } from "../server/lib/photos.js";
+import { purgeExpiredPunchPhotos } from "../server/lib/photo-retention.js";
 import { createTenant } from "../server/lib/tenants.js";
 import { addDays, todayIn, weekday } from "../server/lib/dates.js";
 import { sslFor } from "./lib/ssl.js";
 
 const app = getApp();
 const suffix = randomBytes(3).toString("hex");
+// Photos uploaded during the run go to their own Cloudinary folder, deleted at the end.
+const PHOTO_FOLDER = `lasan-people-pro-test/${suffix}`;
+process.env.CLOUDINARY_FOLDER = PHOTO_FOLDER;
+if (!process.env.CLOUDINARY_API_SECRET) throw new Error("Set the CLOUDINARY_* variables: the photo checks need real photo storage.");
+// An 8×8 PNG: small, but a real image that photo storage will accept.
+const PNG =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP4z8CAFWEXHbQSACj/P8Fu7N9hAAAAAElFTkSuQmCC";
+
+/** Whether a stored photo still exists in Cloudinary (asked of the Admin API, not the CDN cache). */
+async function cloudinaryHas(ref) {
+  const id = ref.slice("cld:".length).replace(/\.[a-z0-9]+$/i, "");
+  const auth = Buffer.from(`${process.env.CLOUDINARY_API_KEY}:${process.env.CLOUDINARY_API_SECRET}`).toString("base64");
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/resources/image/authenticated/${id}`, {
+    headers: { authorization: `Basic ${auth}` },
+  });
+  return res.status === 200;
+}
 const W = { slug: `app-${suffix}`, company: "App Test" };
 const P = { email: `platform-${suffix}@app.test`, password: "Platf0rmPass", slug: `plat-${suffix}` };
 const PASSWORD = "Passw0rd!";
@@ -192,9 +211,10 @@ try {
   });
 
   console.log("Photo punch");
-  // A 1×1 JPEG; the API checks the format and size, not what's in the picture.
+  // A 16×16 JPEG made by a browser canvas, like the camera screen's: tiny, but a complete image
+  // that photo storage will accept.
   const PHOTO =
-    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=";
+    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAQABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAL/xAAfEAABAgYDAAAAAAAAAAAAAAASBhQAAREWJDJDYaH/xAAUAQEAAAAAAAAAAAAAAAAAAAAG/8QAGxEAAAcBAAAAAAAAAAAAAAAAABMjMVFigZH/2gAMAwEAAhEDEQA/AKSiUud3mtWwcRkRdypr7BVpS2Gma6cnxAIj3Ou3kEoq7Yd4TpyHKAiXU67eQVarudphNWx8pkQ9Spr7CJc+mR1wfQIvs8Yf/9k=";
   const snapper = await person("PIC1");
   const peer = await person("PIC2");
 
@@ -229,9 +249,24 @@ try {
   await check("a punch photo is visible to its owner and admins only", async () => {
     const own = await call(`/attendance/${punchId}/photos/in`, { token: snapper.token });
     ok(own);
-    assert.equal(own.body.photo, PHOTO);
+    assert.match(own.body.photo, /^data:image\/jpeg;base64,/);
     ok(await call(`/attendance/${punchId}/photos/out`, { token: W.token }));
     assert.equal((await call(`/attendance/${punchId}/photos/in`, { token: peer.token })).status, 404);
+  });
+
+  await check("punch photos are kept in photo storage, not in the database", async () => {
+    const rows = await ownerSql`select photo from attendance_photos where attendance_id = ${punchId}`;
+    assert.equal(rows.length, 2);
+    for (const r of rows) assert.match(r.photo, /^cld:lasan-people-pro-test\//, "stored as a Cloudinary reference");
+  });
+
+  await check("check-in photos older than the retention period are deleted", async () => {
+    await ownerSql`update attendance_photos set created_at = now() - interval '8 days' where attendance_id = ${punchId} and kind = 'in'`;
+    assert.ok((await purgeExpiredPunchPhotos({ days: 7 })) >= 1);
+    const kinds = (await ownerSql`select kind from attendance_photos where attendance_id = ${punchId}`).map((r) => r.kind);
+    assert.deepEqual(kinds, ["out"], "the week-old photo is gone, today's stays");
+    assert.equal((await call(`/attendance/${punchId}/photos/in`, { token: W.token })).status, 404);
+    ok(await call(`/attendance/${punchId}/photos/out`, { token: W.token }));
   });
 
   await check("people without photo punch still punch with location only", async () => {
@@ -252,7 +287,7 @@ try {
   await check("employees see active colleagues' work details only, with photos on request", async () => {
     const colleague = await person("DIR1");
     const leaver = await person("DIR2");
-    const photo = "data:image/png;base64,iVBORw0KGgo=";
+    const photo = PNG;
     ok(await call("/me/profile", { method: "PUT", token: colleague.token, body: { avatar: photo, phone: "+91 98765 43210", bloodGroup: "O+" } }));
     ok(await call("/me/profile", { method: "PUT", token: leaver.token, body: { avatar: photo } }));
     ok(await call(`/admin/employees/${leaver.id}/revoke`, { method: "POST", token: W.token }));
@@ -268,11 +303,29 @@ try {
 
     const got = await call(`/directory/${colleague.id}/photo`, { token: worker.token });
     ok(got);
-    assert.equal(got.body.photo, photo);
+    assert.match(got.body.photo, /^data:image\/png;base64,/);
+    assert.match(entry.hasPhoto && (await call("/auth/me", { token: colleague.token })).body.user.avatar, /^\/profile-photo\//, "pages get a link, not the image");
     assert.equal((await call(`/directory/${leaver.id}/photo`, { token: worker.token })).status, 404);
     assert.equal((await call("/directory/00000000-0000-4000-8000-000000000000/photo", { token: worker.token })).status, 404);
     // Profiles themselves stay private: the colleague's phone and blood group aren't reachable.
     assert.equal((await call(`/admin/employees/${colleague.id}`, { token: worker.token })).status, 403);
+    // Admins can still see a revoked person's photo.
+    ok(await call(`/directory/${leaver.id}/photo`, { token: W.token }));
+  });
+
+  await check("a new profile photo replaces the old one in photo storage", async () => {
+    const who = await person("DIR3");
+    const stored = async () => (await ownerSql`select avatar from profiles where user_id = ${who.id}`)[0].avatar;
+    ok(await call("/me/profile", { method: "PUT", token: who.token, body: { avatar: PNG } }));
+    const first = await stored();
+    assert.match(first, /^cld:lasan-people-pro-test\//);
+    ok(await call("/me/profile", { method: "PUT", token: who.token, body: { avatar: PNG } }));
+    const second = await stored();
+    assert.notEqual(second, first);
+    assert.equal(await cloudinaryHas(first), false, "the replaced photo is deleted from storage");
+    ok(await call("/me/profile", { method: "PUT", token: who.token, body: { avatar: null } }));
+    assert.equal(await stored(), null);
+    assert.equal(await cloudinaryHas(second), false, "a removed photo is deleted from storage");
   });
 
   console.log("Sign-in security");
@@ -603,7 +656,8 @@ try {
 } finally {
   await ownerSql`delete from tenants where slug in (${W.slug}, ${P.slug})`;
   await ownerSql`delete from app.platform_admins where email in (${P.email}, ${`colleague-${suffix}@app.test`}, ${`admin2-${suffix}@app.test`}, ${`forgot-${suffix}@app.test`})`;
+  await deletePhotosByPrefix(`${PHOTO_FOLDER}/`);
   await Promise.all([ownerSql.end(), closeDb()]);
-  console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}. Test workspace removed.`);
+  console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}. Test workspace and photos removed.`);
 }
 

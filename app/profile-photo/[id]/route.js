@@ -1,7 +1,8 @@
 import { api, ApiError } from "@/lib/api";
 
-// A colleague's profile photo for the directory, served as an image so the page can lazy-load it.
-// The API only returns photos of active people in the viewer's own workspace.
+// A person's profile photo, served as an image so pages can lazy-load it with <img>. The API decides
+// who may see it (colleagues in the same workspace, admins, and the person themselves) and fetches it
+// from photo storage; the browser never sees where it is stored.
 export async function GET(_request, ctx) {
   const { id } = await ctx.params;
   let photo;
@@ -13,8 +14,8 @@ export async function GET(_request, ctx) {
   }
   const match = photo.match(/^data:(image\/[a-z]+);base64,(.*)$/);
   if (!match) return new Response("Not found", { status: 404 });
-  // Not cached: on a shared device the next person to sign in must not be served it without a check.
+  // Links carry ?v= that changes with the photo, so a short private cache is safe and keeps lists fast.
   return new Response(Buffer.from(match[2], "base64"), {
-    headers: { "content-type": match[1], "cache-control": "private, no-store" },
+    headers: { "content-type": match[1], "cache-control": "private, max-age=3600" },
   });
 }

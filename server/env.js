@@ -11,6 +11,14 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   JWT_TTL: z.string().default("7d"),
   APP_TIMEZONE: z.string().default(process.env.NEXT_PUBLIC_APP_TIMEZONE ?? "Asia/Kolkata"),
+  // Profile and check-in photos live in Cloudinary (server/lib/photos.js). Without these, photos are
+  // kept inline in the database, which is fine for local development only.
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  CLOUDINARY_FOLDER: z.string().default("lasan-people-pro"),
+  // Check-in photos are deleted once they are this many days old (npm run photos:purge).
+  PUNCH_PHOTO_RETENTION_DAYS: z.coerce.number().int().min(1).default(7),
 });
 
 let parsed;

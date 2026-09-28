@@ -6,6 +6,7 @@ import { signToken, verifyPassword, hashPassword, publicUser } from "../lib/auth
 import { badRequest, unauthorized, forbidden } from "../lib/errors.js";
 import { password } from "../lib/validators.js";
 import { audit } from "../lib/audit.js";
+import { avatarUrl } from "../lib/photos.js";
 import { inTenant, requireAuth } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 import { addressBlock, createLimiter, clientIp } from "../middleware/rate-limit.js";
@@ -119,7 +120,7 @@ authRoutes.get("/me", requireAuth, async (c) => {
     .select({ avatar: profiles.avatar })
     .from(profiles)
     .where(eq(profiles.userId, user.id));
-  return c.json({ user: { ...publicUser(user), avatar: profile?.avatar ?? null }, tenant: publicTenant(c.get("tenant")) });
+  return c.json({ user: { ...publicUser(user), avatar: avatarUrl(user.id, profile?.avatar) }, tenant: publicTenant(c.get("tenant")) });
 });
 
 authRoutes.post(
