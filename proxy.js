@@ -75,6 +75,7 @@ export function proxy(request) {
 }
 
 export const config = {
-  // Everything except build assets, so the address rules also cover the API, photos and legal pages.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Everything except build assets and the tab icon (which both addresses serve), so the address rules
+  // also cover the API, photos and legal pages.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg).*)"],
 };

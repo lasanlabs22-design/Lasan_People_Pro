@@ -5,8 +5,8 @@ export function Logo({ className, withText = true }) {
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <span className="relative grid size-8 place-items-center rounded-md bg-brand-500">
         <svg viewBox="0 0 24 24" className="size-5 text-on-brand" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M5 4v12a4 4 0 0 0 4 4h10" />
-          <circle cx="16" cy="9" r="3" />
+          <path d="M4.5 12l5.38 5.38a3 3 0 0 0 4.24 0L19.5 12" />
+          <circle cx="12" cy="8.8" r="2.3" />
         </svg>
       </span>
       {withText && (
